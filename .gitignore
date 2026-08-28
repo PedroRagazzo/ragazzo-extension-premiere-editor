@@ -1,0 +1,6 @@
+# Pastas de terceiros que ficam no disco mas NÃO fazem parte desta extensão.
+# São arquivos do produto comercial "EP Legendas (Editor Premium)" —
+# incluem ExtendScript compilado (.jsxbin) e bibliotecas de templates proprietárias.
+# Não versionar e não sincronizar para a pasta do Premiere.
+audio/
+texto/
