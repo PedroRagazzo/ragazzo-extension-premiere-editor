@@ -1,41 +1,98 @@
 :root {
-  --bg: #1e1e1e;
-  --panel: #262626;
-  --card: #2d2d2d;
-  --card-hover: #333333;
-  --border: #3a3a3a;
-  --text: #e8e8e8;
-  --text-dim: #9a9a9a;
-  --accent: #4f8dfd;
-  --ok: #4caf82;
-  --err: #e0654f;
+  --bg: #161615;
+  --panel: #1d1c1b;
+  --card: #232221;
+  --card-hover: #2a2928;
+  --border: #37342f;
+  --border-soft: #2a2826;
+  --text: #f3efe9;
+  --text-dim: #9d968c;
+  --accent: #ff7a26;
+  --accent-2: #ffa74d;
+  --accent-soft: rgba(255, 122, 38, 0.14);
+  --accent-glow: rgba(255, 122, 38, 0.35);
+  --ok: #57c08a;
+  --err: #ef5f4d;
 }
 
 * { box-sizing: border-box; }
 
+::selection {
+  background: var(--accent-glow);
+  color: #fff;
+}
+
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(900px 260px at 50% -80px, rgba(255, 122, 38, 0.07), transparent 70%),
+    var(--bg);
   color: var(--text);
   font-family: "Segoe UI", -apple-system, sans-serif;
   font-size: 12px;
 }
 
-header {
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--border);
+/* scrollbar (chromium/CEF) */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
 }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+header {
+  padding: 16px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(255, 122, 38, 0.06), transparent);
+  position: relative;
+}
+
+header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent 65%);
+  opacity: .7;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: linear-gradient(145deg, var(--accent-2), var(--accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1108;
+  box-shadow: 0 3px 10px var(--accent-glow);
+}
+
+.brand-mark svg { width: 17px; height: 17px; }
+
+header .brand-text { flex: 1; min-width: 0; }
 
 header h1 {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: .2px;
+  background: linear-gradient(90deg, var(--text), var(--accent-2) 140%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 header p {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 main {
@@ -48,15 +105,22 @@ main {
 /* ---------- cartão colapsável (troca de <details> por grid animável) ---------- */
 
 .effect-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: linear-gradient(180deg, var(--card), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
   overflow: hidden;
-  transition: border-color 150ms ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .effect-card:hover {
-  border-color: #4a4a4a;
+  border-color: #4a453d;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.effect-card.open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .effect-header {
@@ -74,7 +138,12 @@ main {
 }
 
 .effect-header:hover .effect-icon {
-  background: #5c96fd;
+  background: linear-gradient(145deg, var(--accent-2), var(--accent));
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.effect-card.open .effect-header {
+  color: var(--accent-2);
 }
 
 .effect-header:focus-visible {
@@ -126,14 +195,14 @@ main {
 .effect-icon {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  background: var(--accent);
+  border-radius: 8px;
+  background: linear-gradient(145deg, var(--accent), #d9611a);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #fff;
-  transition: background 150ms ease;
+  color: #1a1108;
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 
 .effect-icon svg {
@@ -273,15 +342,16 @@ select, input[type="number"], input[type="text"] {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 5px 7px;
   width: 110px;
-  transition: border-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 select:focus, input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .btn-group {
@@ -338,7 +408,7 @@ select:focus, input:focus {
   cursor: pointer;
 }
 
-.preset-chip:hover { border-color: var(--accent); }
+.preset-chip:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 
 .preset-chip .preset-del {
   background: transparent;
@@ -356,27 +426,31 @@ button {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 7px 8px;
   cursor: pointer;
   font-size: 11px;
-  transition: background 120ms ease, transform 80ms ease, border-color 120ms ease;
+  transition: background 120ms ease, transform 80ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
-button:hover { background: var(--card-hover); border-color: #4a4a4a; }
+button:hover { background: var(--card-hover); border-color: #4a453d; }
 button:active { transform: scale(0.96); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 button.primary {
-  background: var(--accent);
+  background: linear-gradient(145deg, var(--accent-2), var(--accent));
   border-color: var(--accent);
-  color: #fff;
+  color: #1a1108;
   width: 100%;
   margin-top: 2px;
-  padding: 8px;
-  font-weight: 600;
+  padding: 9px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: 0 3px 10px var(--accent-glow);
 }
 
-button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.primary:hover { filter: brightness(1.06); box-shadow: 0 4px 14px var(--accent-glow); }
+button.primary:active { transform: scale(0.97); }
 
 /* ---------- status ---------- */
 
@@ -523,7 +597,7 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
   cursor: pointer;
 }
 
-.curve-preset:hover { border-color: var(--accent); }
+.curve-preset:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 
 .curve-thumb-svg {
   width: 100%;
