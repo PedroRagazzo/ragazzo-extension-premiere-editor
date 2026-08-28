@@ -395,18 +395,64 @@
       </button>
       <div class="effect-body">
         <div class="effect-body-inner">
-          <div class="row">
-            <label for="anim-preset">Predefinição</label>
-            <select id="anim-preset">
-              <option value="slide-left">Deslizar da esquerda</option>
-              <option value="slide-right">Deslizar da direita</option>
-              <option value="slide-top">Deslizar de cima</option>
-              <option value="slide-bottom">Deslizar de baixo</option>
-              <option value="fade-in">Fade in</option>
-              <option value="fade-out">Fade out</option>
-              <option value="pop">Pop (escala)</option>
-              <option value="rotate-in">Girar + fade in</option>
-            </select>
+          <p class="hint">Predefinição</p>
+          <div id="anim-preset-grid" class="anim-preset-grid" role="radiogroup">
+            <button type="button" class="anim-preset-btn selected" data-preset="slide-left" role="radio" aria-checked="true" title="Deslizar da esquerda">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-slide-left" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Esquerda</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="slide-right" role="radio" aria-checked="false" title="Deslizar da direita">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-slide-right" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Direita</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="slide-top" role="radio" aria-checked="false" title="Deslizar de cima">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-slide-top" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>De cima</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="slide-bottom" role="radio" aria-checked="false" title="Deslizar de baixo">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-slide-bottom" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>De baixo</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="fade-in" role="radio" aria-checked="false" title="Fade in">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-fade-in" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Fade in</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="fade-out" role="radio" aria-checked="false" title="Fade out">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-fade-out" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Fade out</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="pop" role="radio" aria-checked="false" title="Pop (escala)">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-pop" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Pop</span>
+            </button>
+            <button type="button" class="anim-preset-btn" data-preset="rotate-in" role="radio" aria-checked="false" title="Girar + fade in">
+              <svg viewBox="0 0 32 32" class="anim-icon">
+                <rect class="anim-frame" x="4" y="4" width="24" height="24" rx="3"/>
+                <rect class="anim-obj anim-ico-rotate-in" x="11" y="11" width="10" height="10" rx="2"/>
+              </svg>
+              <span>Girar</span>
+            </button>
           </div>
           <div class="row slider-row">
             <label for="anim-duration">Duração</label>

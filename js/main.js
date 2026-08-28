@@ -239,8 +239,22 @@
     );
   });
 
+  var animPresetGrid = document.getElementById("anim-preset-grid");
+  var animPresetButtons = animPresetGrid.querySelectorAll(".anim-preset-btn");
+  Array.prototype.forEach.call(animPresetButtons, function (btn) {
+    btn.addEventListener("click", function () {
+      Array.prototype.forEach.call(animPresetButtons, function (b) {
+        b.classList.remove("selected");
+        b.setAttribute("aria-checked", "false");
+      });
+      btn.classList.add("selected");
+      btn.setAttribute("aria-checked", "true");
+    });
+  });
+
   document.getElementById("apply-anim").addEventListener("click", function () {
-    var preset = document.getElementById("anim-preset").value;
+    var selectedBtn = animPresetGrid.querySelector(".anim-preset-btn.selected");
+    var preset = selectedBtn ? selectedBtn.getAttribute("data-preset") : "slide-left";
     var duration = document.getElementById("anim-duration").value;
     var easing = document.getElementById("anim-easing").value;
     run("applyAnimateClip('" + preset + "', " + JSON.stringify(duration) + ", '" + easing + "')");
