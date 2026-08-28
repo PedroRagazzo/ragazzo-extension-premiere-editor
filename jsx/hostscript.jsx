@@ -1,0 +1,1406 @@
+// Script ExtendScript original que aplica os efeitos Zoom, Velocidade e Alinhamento
+// nos clipes selecionados da sequência ativa do Premiere Pro.
+
+function _findComponent(trackItem, displayName) {
+  for (var i = 0; i < trackItem.components.numItems; i++) {
+    var c = trackItem.components[i];
+    if (c.displayName === displayName) return c;
+  }
+  return null;
+}
+
+function _findParam(component, displayName) {
+  for (var i = 0; i < component.properties.numItems; i++) {
+    var p = component.properties[i];
+    if (p.displayName === displayName) return p;
+  }
+  return null;
+}
+
+function _timeAt(seconds) {
+  var t = new Time();
+  t.seconds = seconds;
+  return t;
+}
+
+// Curvas de easing (equações clássicas de Robert Penner, domínio público).
+// easing: "linear" | "easeIn" | "easeOut" | "easeInOut" | "back"
+function _ease(easing, t) {
+  switch (easing) {
+    case "easeIn":
+      return t * t;
+    case "easeOut":
+      return 1 - (1 - t) * (1 - t);
+    case "easeInOut":
+      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    case "back": {
+      var c1 = 1.70158, c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    default:
+      return t;
+  }
+}
+
+// Curva de Bézier cúbica genérica (P0=0,0 e P3=1,1 fixos, P1/P2 arrastáveis pelo usuário
+// no editor visual). Resolve x(t)=alvo por Newton-Raphson, igual navegadores fazem para
+// CSS cubic-bezier(), depois lê y(t).
+function _bezierAxis(t, p1, p2) {
+  var mt = 1 - t;
+  return 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t;
+}
+
+function _bezierAxisDerivative(t, p1, p2) {
+  var mt = 1 - t;
+  return 3 * mt * mt * p1 + 6 * mt * t * (p2 - p1) + 3 * t * t * (1 - p2);
+}
+
+function _solveBezierT(x, p1x, p2x) {
+  var t = x;
+  for (var i = 0; i < 8; i++) {
+    var dx = _bezierAxis(t, p1x, p2x) - x;
+    var d = _bezierAxisDerivative(t, p1x, p2x);
+    if (Math.abs(d) < 1e-6) break;
+    t -= dx / d;
+    t = Math.max(0, Math.min(1, t));
+  }
+  return t;
+}
+
+function _bezierEase(p1x, p1y, p2x, p2y, x) {
+  if (p1x === p1y && p2x === p2y) return x;
+  var t = _solveBezierT(x, p1x, p2x);
+  return _bezierAxis(t, p1y, p2y);
+}
+
+// Igual a _bakeEasedKeyframes, mas com uma curva de Bézier customizada (P1/P2 vindos
+// do editor visual) em vez de um preset nomeado.
+function _bakeBezierKeyframes(param, startSeconds, durationSeconds, fromValue, toValue, p1x, p1y, p2x, p2y, steps) {
+  if (!param.isTimeVarying()) param.setTimeVarying(true);
+  steps = steps || 16;
+  var isArr = fromValue instanceof Array;
+
+  for (var i = 0; i <= steps; i++) {
+    var x = i / steps;
+    var e = _bezierEase(p1x, p1y, p2x, p2y, x);
+    var time = _timeAt(startSeconds + durationSeconds * x);
+    var val = isArr
+      ? [fromValue[0] + (toValue[0] - fromValue[0]) * e, fromValue[1] + (toValue[1] - fromValue[1]) * e]
+      : fromValue + (toValue - fromValue) * e;
+    param.addKey(time);
+    param.setValueAtKey(time, val, true);
+  }
+}
+
+// Em vez de depender de uma API incerta de tipo de interpolação do Premiere, "assamos"
+// a curva de easing diretamente em várias keyframes intermediárias — funciona com as
+// mesmas chamadas (addKey/setValueAtKey) já usadas no resto do script.
+function _bakeEasedKeyframes(param, startSeconds, durationSeconds, fromValue, toValue, easing, steps) {
+  if (!param.isTimeVarying()) param.setTimeVarying(true);
+  steps = steps || 14;
+  var isArr = fromValue instanceof Array;
+
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var e = _ease(easing, t);
+    var time = _timeAt(startSeconds + durationSeconds * t);
+    var val = isArr
+      ? [fromValue[0] + (toValue[0] - fromValue[0]) * e, fromValue[1] + (toValue[1] - fromValue[1]) * e]
+      : fromValue + (toValue - fromValue) * e;
+    param.addKey(time);
+    param.setValueAtKey(time, val, true);
+  }
+}
+
+// Retorna os TrackItems de vídeo selecionados na sequência ativa.
+function _getSelectedVideoItems(seq) {
+  var items = [];
+
+  if (typeof seq.getSelection === "function") {
+    var sel = seq.getSelection();
+    for (var i = 0; i < sel.length; i++) {
+      if (sel[i].mediaType === "Video") items.push(sel[i]);
+    }
+    if (items.length > 0) return items;
+  }
+
+  for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+    var track = seq.videoTracks[t];
+    for (var c = 0; c < track.clips.numItems; c++) {
+      var clip = track.clips[c];
+      if (typeof clip.isSelected === "function" && clip.isSelected()) {
+        items.push(clip);
+      }
+    }
+  }
+  return items;
+}
+
+function _requireSequence() {
+  var seq = app.project.activeSequence;
+  if (!seq) throw new Error("Nenhuma sequência ativa. Abra uma sequência no Premiere.");
+  return seq;
+}
+
+function _getSelectedAudioItems(seq) {
+  var items = [];
+
+  if (typeof seq.getSelection === "function") {
+    var sel = seq.getSelection();
+    for (var i = 0; i < sel.length; i++) {
+      if (sel[i].mediaType === "Audio") items.push(sel[i]);
+    }
+    if (items.length > 0) return items;
+  }
+
+  for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+    var track = seq.audioTracks[t];
+    for (var c = 0; c < track.clips.numItems; c++) {
+      var clip = track.clips[c];
+      if (typeof clip.isSelected === "function" && clip.isSelected()) {
+        items.push(clip);
+      }
+    }
+  }
+  return items;
+}
+
+// ---------- ZOOM ----------
+// direction: "in" (cresce ao longo do clipe) ou "out" (diminui)
+// amountPercent: quanto somar/subtrair da escala (ex.: 25 = de 100% a 125%)
+// easing: "linear" | "easeIn" | "easeOut" | "easeInOut" | "back"
+function applyZoom(direction, amountPercent, easing) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var amount = parseFloat(amountPercent);
+    var applied = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      if (!scale) continue;
+
+      var start = item.start.seconds;
+      var end = item.end.seconds;
+      var from = direction === "in" ? 100 : (100 + amount);
+      var to = direction === "in" ? (100 + amount) : 100;
+
+      _bakeEasedKeyframes(scale, start, end - start, from, to, easing || "linear");
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível localizar o parâmetro Escala nos clipes selecionados.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- VELOCIDADE ----------
+// speedPercent: nova velocidade em % (ex.: 200 = 2x mais rápido, 50 = câmera lenta)
+function applySpeed(speedPercent) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var speed = parseFloat(speedPercent);
+    if (!speed || speed <= 0) return "erro:Velocidade inválida.";
+
+    if (typeof app.enableQE === "function") app.enableQE();
+    var applied = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var qeItem = _findQeItem(seq, item);
+      if (qeItem && typeof qeItem.setSpeed === "function") {
+        qeItem.setSpeed(speed, false, false, true);
+        applied++;
+      }
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível alterar a velocidade (verifique se o QE DOM está disponível nesta versão do Premiere).";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// A QE DOM (legada/não documentada) expressa start/end em "ticks" (254016000000 por
+// segundo), não em segundos — usar .seconds nesses valores sempre resulta em NaN.
+var _TICKS_PER_SECOND = 254016000000;
+
+function _qeTicksToSeconds(ticks) {
+  return parseFloat(ticks) / _TICKS_PER_SECOND;
+}
+
+function _findQeItem(seq, trackItem) {
+  return _findQeItemGeneric(seq, trackItem, "Video");
+}
+
+// mediaType: "Video" | "Audio"
+function _findQeItemGeneric(seq, trackItem, mediaType) {
+  if (typeof qe === "undefined") return null;
+  var qeSeq = qe.project.getActiveSequence();
+  var numTracks = mediaType === "Audio" ? qeSeq.numAudioTracks : qeSeq.numVideoTracks;
+  for (var t = 0; t < numTracks; t++) {
+    var qeTrack = mediaType === "Audio" ? qeSeq.getAudioTrackAt(t) : qeSeq.getVideoTrackAt(t);
+    for (var c = 0; c < qeTrack.numItems; c++) {
+      var qeItem = qeTrack.getItemAt(c);
+      if (Math.abs(_qeTicksToSeconds(qeItem.start) - trackItem.start.seconds) < 0.05) {
+        return qeItem;
+      }
+    }
+  }
+  return null;
+}
+
+function _findTrackIndexOf(seq, item) {
+  var tracks = item.mediaType === "Audio" ? seq.audioTracks : seq.videoTracks;
+  for (var t = 0; t < tracks.numTracks; t++) {
+    var track = tracks[t];
+    for (var c = 0; c < track.clips.numItems; c++) {
+      var clip = track.clips[c];
+      if (clip === item || Math.abs(clip.start.seconds - item.start.seconds) < 0.001) {
+        return t + 1;
+      }
+    }
+  }
+  return 1;
+}
+
+// ---------- ALINHAMENTO ----------
+// align: "left" | "center" | "right" | "top" | "middle" | "bottom"
+function applyAlignment(align) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var applied = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      if (!position) continue;
+
+      var current = position.getValue();
+      var x = current[0];
+      var y = current[1];
+
+      if (align === "left") x = 0;
+      else if (align === "center") x = frameW / 2;
+      else if (align === "right") x = frameW;
+      else if (align === "top") y = 0;
+      else if (align === "middle") y = frameH / 2;
+      else if (align === "bottom") y = frameH;
+
+      position.setValue([x, y], true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível localizar o parâmetro Posição nos clipes selecionados.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- UTILIDADES DE MOVIMENTO (copiar / colar / zerar) ----------
+function copyMotion() {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione um clipe de vídeo para copiar o movimento.";
+
+    var item = items[0];
+    var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+    if (!motion) return "erro:Este clipe não tem o componente Motion.";
+
+    var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+    var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+    var rotation = _findParam(motion, "Rotation") || _findParam(motion, "Rotação");
+    var opacity = _findComponent(item, "Opacity") || _findComponent(item, "Opacidade");
+    var opParam = opacity ? (_findParam(opacity, "Opacity") || _findParam(opacity, "Opacidade")) : null;
+
+    var data = {
+      position: position ? position.getValue() : null,
+      scale: scale ? scale.getValue() : null,
+      rotation: rotation ? rotation.getValue() : null,
+      opacity: opParam ? opParam.getValue() : null
+    };
+
+    return "ok:" + JSON.stringify(data);
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// dataJson: string retornada por copyMotion() (o "ok:" já removido pelo painel)
+function pasteMotion(dataJson) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var data = JSON.parse(dataJson);
+    var applied = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var rotation = _findParam(motion, "Rotation") || _findParam(motion, "Rotação");
+      var opacity = _findComponent(item, "Opacity") || _findComponent(item, "Opacidade");
+      var opParam = opacity ? (_findParam(opacity, "Opacity") || _findParam(opacity, "Opacidade")) : null;
+
+      if (position && data.position) {
+        if (position.isTimeVarying()) position.setTimeVarying(false);
+        position.setValue(data.position, true);
+      }
+      if (scale && data.scale !== null && data.scale !== undefined) {
+        if (scale.isTimeVarying()) scale.setTimeVarying(false);
+        scale.setValue(data.scale, true);
+      }
+      if (rotation && data.rotation !== null && data.rotation !== undefined) {
+        if (rotation.isTimeVarying()) rotation.setTimeVarying(false);
+        rotation.setValue(data.rotation, true);
+      }
+      if (opParam && data.opacity !== null && data.opacity !== undefined) {
+        if (opParam.isTimeVarying()) opParam.setTimeVarying(false);
+        opParam.setValue(data.opacity, true);
+      }
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível colar o movimento.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+function resetMotion() {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var applied = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var rotation = _findParam(motion, "Rotation") || _findParam(motion, "Rotação");
+      var opacity = _findComponent(item, "Opacity") || _findComponent(item, "Opacidade");
+      var opParam = opacity ? (_findParam(opacity, "Opacity") || _findParam(opacity, "Opacidade")) : null;
+
+      if (position) {
+        if (position.isTimeVarying()) position.setTimeVarying(false);
+        position.setValue([frameW / 2, frameH / 2], true);
+      }
+      if (scale) {
+        if (scale.isTimeVarying()) scale.setTimeVarying(false);
+        scale.setValue(100, true);
+      }
+      if (rotation) {
+        if (rotation.isTimeVarying()) rotation.setTimeVarying(false);
+        rotation.setValue(0, true);
+      }
+      if (opParam) {
+        if (opParam.isTimeVarying()) opParam.setTimeVarying(false);
+        opParam.setValue(100, true);
+      }
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível zerar o movimento.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- RECORTAR (crop-to-fill via zoom + âncora) ----------
+// Assume que o clipe já preenche o quadro em Escala 100% (ex.: mídia importada com
+// "Ajustar ao Tamanho do Quadro"). O corte é feito ampliando e deslocando a âncora.
+// anchorX: "left" | "center" | "right"   anchorY: "top" | "middle" | "bottom"
+function applyCrop(amountPercent, anchorX, anchorY) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var amount = parseFloat(amountPercent);
+    if (!amount || amount <= 0) return "erro:Intensidade de corte inválida.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var s = 1 + amount / 100;
+    var extraW = (s - 1) * frameW;
+    var extraH = (s - 1) * frameH;
+
+    var x = frameW / 2;
+    if (anchorX === "left") x = frameW / 2 - extraW / 2;
+    else if (anchorX === "right") x = frameW / 2 + extraW / 2;
+
+    var y = frameH / 2;
+    if (anchorY === "top") y = frameH / 2 - extraH / 2;
+    else if (anchorY === "bottom") y = frameH / 2 + extraH / 2;
+
+    var applied = 0;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      if (!scale || !position) continue;
+
+      if (scale.isTimeVarying()) scale.setTimeVarying(false);
+      scale.setValue(100 * s, true);
+      if (position.isTimeVarying()) position.setTimeVarying(false);
+      position.setValue([x, y], true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível localizar Escala/Posição nos clipes selecionados.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- TELA DIVIDIDA ----------
+// layout: "2h" (lado a lado) | "2v" (empilhado) | "4grid" (2x2)
+// Usa os clipes de vídeo selecionados, na ordem das trilhas (V1, V2, V3...).
+// Mesma premissa da função applyCrop: clipe preenche o quadro em Escala 100%.
+function applySplitScreen(layout) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItemsOrderedByTrack(seq);
+
+    var need = layout === "4grid" ? 4 : 2;
+    if (items.length < need) {
+      return "erro:Selecione " + need + " clipes de vídeo (em trilhas diferentes) para este layout.";
+    }
+    items = items.slice(0, need);
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var cells;
+
+    if (layout === "2h") {
+      cells = [
+        { x: frameW * 0.25, y: frameH * 0.5 },
+        { x: frameW * 0.75, y: frameH * 0.5 }
+      ];
+    } else if (layout === "2v") {
+      cells = [
+        { x: frameW * 0.5, y: frameH * 0.25 },
+        { x: frameW * 0.5, y: frameH * 0.75 }
+      ];
+    } else {
+      cells = [
+        { x: frameW * 0.25, y: frameH * 0.25 },
+        { x: frameW * 0.75, y: frameH * 0.25 },
+        { x: frameW * 0.25, y: frameH * 0.75 },
+        { x: frameW * 0.75, y: frameH * 0.75 }
+      ];
+    }
+
+    var applied = 0;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      if (!scale || !position) continue;
+
+      if (scale.isTimeVarying()) scale.setTimeVarying(false);
+      scale.setValue(50, true);
+      if (position.isTimeVarying()) position.setTimeVarying(false);
+      position.setValue([cells[i].x, cells[i].y], true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível montar a tela dividida.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- DISTRIBUIR ----------
+// orientation: "row" (lado a lado, uma linha) | "column" (empilhado, uma coluna)
+// Generaliza a Tela Dividida para N clipes numa única fileira (em vez de grade fixa).
+function applyDistribute(orientation) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItemsOrderedByTrack(seq);
+    if (items.length < 2) return "erro:Selecione 2 ou mais clipes de vídeo (em trilhas diferentes) para distribuir.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var n = items.length;
+    var scaleValue = 100 / n;
+    var applied = 0;
+
+    for (var i = 0; i < n; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      if (!scale || !position) continue;
+
+      var x, y;
+      if (orientation === "column") {
+        x = frameW / 2;
+        y = (i + 0.5) * (frameH / n);
+      } else {
+        x = (i + 0.5) * (frameW / n);
+        y = frameH / 2;
+      }
+
+      if (scale.isTimeVarying()) scale.setTimeVarying(false);
+      scale.setValue(scaleValue, true);
+      if (position.isTimeVarying()) position.setTimeVarying(false);
+      position.setValue([x, y], true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível distribuir os clipes.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- CASCATA ----------
+// Empilha os clipes selecionados (tipo picture-in-picture em camadas), a partir da
+// posição/escala atuais do PRIMEIRO clipe selecionado (na ordem das trilhas).
+// corner: de que canto os próximos clipes "nascem" — define o sentido do deslocamento.
+function applyCascade(scaleStepPercent, offsetStepPercent, corner) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItemsOrderedByTrack(seq);
+    if (items.length < 2) return "erro:Selecione 2 ou mais clipes de vídeo (em trilhas diferentes) para a cascata.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var scaleStep = parseFloat(scaleStepPercent);
+    var offsetStep = parseFloat(offsetStepPercent) / 100;
+
+    var signX = (corner === "top-right" || corner === "bottom-right") ? -1 : 1;
+    var signY = (corner === "bottom-left" || corner === "bottom-right") ? -1 : 1;
+
+    var baseItem = items[0];
+    var baseMotion = _findComponent(baseItem, "Motion") || _findComponent(baseItem, "Movimento");
+    if (!baseMotion) return "erro:O primeiro clipe selecionado não tem o componente Motion.";
+    var baseScaleParam = _findParam(baseMotion, "Scale") || _findParam(baseMotion, "Escala");
+    var basePositionParam = _findParam(baseMotion, "Position") || _findParam(baseMotion, "Posição");
+    if (!baseScaleParam || !basePositionParam) return "erro:Não encontrei Escala/Posição no primeiro clipe.";
+
+    var baseScale = baseScaleParam.isTimeVarying() ? baseScaleParam.getValueAtTime(_timeAt(baseItem.start.seconds)) : baseScaleParam.getValue();
+    var basePos = basePositionParam.isTimeVarying() ? basePositionParam.getValueAtTime(_timeAt(baseItem.start.seconds)) : basePositionParam.getValue();
+
+    var applied = 0;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+      var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+      if (!scale || !position) continue;
+
+      var newScale = Math.max(15, baseScale - i * scaleStep);
+      var dx = i * offsetStep * frameW * signX;
+      var dy = i * offsetStep * frameH * signY;
+
+      if (scale.isTimeVarying()) scale.setTimeVarying(false);
+      scale.setValue(newScale, true);
+      if (position.isTimeVarying()) position.setTimeVarying(false);
+      position.setValue([basePos[0] + dx, basePos[1] + dy], true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível montar a cascata.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+function _getSelectedVideoItemsOrderedByTrack(seq) {
+  var items = [];
+  for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+    var track = seq.videoTracks[t];
+    for (var c = 0; c < track.clips.numItems; c++) {
+      var clip = track.clips[c];
+      var selected = typeof clip.isSelected === "function" ? clip.isSelected() : false;
+      if (selected) items.push(clip);
+    }
+  }
+  if (items.length > 0) return items;
+  return _getSelectedVideoItems(seq);
+}
+
+// ---------- NIVELAR VOZ ----------
+// Retorna os clipes de áudio selecionados com o caminho do arquivo de mídia,
+// para que o painel (Node.js) meça o loudness via ffmpeg e devolva o ganho a aplicar.
+function getSelectedAudioSourcePaths() {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedAudioItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de áudio na timeline.";
+
+    var list = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var path = "";
+      try {
+        path = item.projectItem.getMediaPath();
+      } catch (e) {
+        path = "";
+      }
+      list.push({ index: i, path: path });
+    }
+    return "ok:" + JSON.stringify(list);
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// gainsJson: JSON de {index, gainDb}[] na MESMA ORDEM/seleção retornada por getSelectedAudioSourcePaths
+function applyGainsToSelection(gainsJson) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedAudioItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de áudio na timeline.";
+
+    var gains = JSON.parse(gainsJson);
+    var applied = 0;
+
+    for (var i = 0; i < gains.length; i++) {
+      var g = gains[i];
+      if (g.gainDb === null || g.gainDb === undefined || isNaN(g.gainDb)) continue;
+      var item = items[g.index];
+      if (!item) continue;
+      var volume = _findComponent(item, "Volume");
+      if (!volume) continue;
+      var level = _findParam(volume, "Level") || _findParam(volume, "Nível");
+      if (!level) continue;
+
+      if (level.isTimeVarying()) level.setTimeVarying(false);
+      level.setValue(g.gainDb, true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível ajustar o ganho dos clipes.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- ÁUDIO INTERCALADO (ducking) ----------
+// voiceTrackIndex / musicTrackIndex: 1-based (como mostrado na UI do Premiere)
+function applyDucking(voiceTrackIndex, musicTrackIndex, duckDb, fadeSeconds) {
+  try {
+    var seq = _requireSequence();
+    var vIdx = parseInt(voiceTrackIndex, 10) - 1;
+    var mIdx = parseInt(musicTrackIndex, 10) - 1;
+    var duck = parseFloat(duckDb);
+    var fade = Math.max(0.05, parseFloat(fadeSeconds));
+
+    if (vIdx < 0 || vIdx >= seq.audioTracks.numTracks) return "erro:Trilha de voz inválida.";
+    if (mIdx < 0 || mIdx >= seq.audioTracks.numTracks) return "erro:Trilha de música inválida.";
+
+    var voiceTrack = seq.audioTracks[vIdx];
+    var musicTrack = seq.audioTracks[mIdx];
+
+    var intervals = [];
+    for (var i = 0; i < voiceTrack.clips.numItems; i++) {
+      var vc = voiceTrack.clips[i];
+      intervals.push({ start: vc.start.seconds, end: vc.end.seconds });
+    }
+    if (intervals.length === 0) return "erro:Não há clipes na trilha de voz selecionada.";
+
+    intervals.sort(function (a, b) { return a.start - b.start; });
+    var merged = [intervals[0]];
+    for (var j = 1; j < intervals.length; j++) {
+      var last = merged[merged.length - 1];
+      if (intervals[j].start - last.end < fade * 2) {
+        last.end = Math.max(last.end, intervals[j].end);
+      } else {
+        merged.push(intervals[j]);
+      }
+    }
+
+    var applied = 0;
+    for (var m = 0; m < musicTrack.clips.numItems; m++) {
+      var clip = musicTrack.clips[m];
+      var volume = _findComponent(clip, "Volume");
+      if (!volume) continue;
+      var level = _findParam(volume, "Level") || _findParam(volume, "Nível");
+      if (!level) continue;
+
+      var baseLevel = level.isTimeVarying() ? level.getValueAtTime(_timeAt(clip.start.seconds)) : level.getValue();
+      if (!level.isTimeVarying()) level.setTimeVarying(true);
+
+      level.addKey(_timeAt(clip.start.seconds));
+      level.setValueAtKey(_timeAt(clip.start.seconds), baseLevel, true);
+
+      for (var k = 0; k < merged.length; k++) {
+        var iv = merged[k];
+        if (iv.end <= clip.start.seconds || iv.start >= clip.end.seconds) continue;
+
+        var duckStart = Math.max(iv.start, clip.start.seconds);
+        var duckEnd = Math.min(iv.end, clip.end.seconds);
+        var preFade = Math.max(clip.start.seconds, duckStart - fade);
+        var postFade = Math.min(clip.end.seconds, duckEnd + fade);
+
+        // Evita keyframes colados demais (menos de 1 frame de distância), que o
+        // Premiere pode rejeitar ou colapsar.
+        var minGap = 1 / 30;
+        if (duckStart - preFade < minGap) preFade = duckStart - minGap;
+        if (postFade - duckEnd < minGap) postFade = duckEnd + minGap;
+
+        level.addKey(_timeAt(preFade));
+        level.setValueAtKey(_timeAt(preFade), baseLevel, true);
+        level.addKey(_timeAt(duckStart));
+        level.setValueAtKey(_timeAt(duckStart), baseLevel + duck, true);
+        level.addKey(_timeAt(duckEnd));
+        level.setValueAtKey(_timeAt(duckEnd), baseLevel + duck, true);
+        level.addKey(_timeAt(postFade));
+        level.setValueAtKey(_timeAt(postFade), baseLevel, true);
+      }
+
+      level.addKey(_timeAt(clip.end.seconds));
+      level.setValueAtKey(_timeAt(clip.end.seconds), baseLevel, true);
+      applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s) de música" : "erro:Não havia clipes de música sobrepondo a trilha de voz.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- ANIMAR CLIPE/OBJETO ----------
+// preset: "slide-left" | "slide-right" | "slide-top" | "slide-bottom" | "fade-in" | "fade-out" | "pop" | "rotate-in"
+// easing: "linear" | "easeIn" | "easeOut" | "easeInOut" | "back"
+function applyAnimateClip(preset, durationSeconds, easing) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var frameW = parseInt(seq.frameSizeHorizontal, 10);
+    var frameH = parseInt(seq.frameSizeVertical, 10);
+    var applied = 0;
+    easing = easing || "easeOut";
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+
+      var clipStart = item.start.seconds;
+      var clipEnd = item.end.seconds;
+      var dur = Math.min(parseFloat(durationSeconds), (clipEnd - clipStart) * 0.9);
+      if (dur <= 0) continue;
+
+      var ok = false;
+
+      if (preset === "slide-left" || preset === "slide-right" || preset === "slide-top" || preset === "slide-bottom") {
+        var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
+        if (position) {
+          var finalPos = position.getValue();
+          var offX = 0, offY = 0;
+          if (preset === "slide-left") offX = -frameW;
+          if (preset === "slide-right") offX = frameW;
+          if (preset === "slide-top") offY = -frameH;
+          if (preset === "slide-bottom") offY = frameH;
+
+          _bakeEasedKeyframes(position, clipStart, dur, [finalPos[0] + offX, finalPos[1] + offY], finalPos, easing);
+          ok = true;
+        }
+      } else if (preset === "pop") {
+        var scale = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+        if (scale) {
+          var finalScale = scale.getValue();
+          // "pop" sempre usa uma curva com leve exagero (overshoot), é a identidade do preset
+          _bakeEasedKeyframes(scale, clipStart, dur, 0, finalScale, "back");
+          ok = true;
+        }
+      } else if (preset === "rotate-in") {
+        var rotation = _findParam(motion, "Rotation") || _findParam(motion, "Rotação");
+        if (rotation) {
+          var finalRot = rotation.getValue();
+          _bakeEasedKeyframes(rotation, clipStart, dur, finalRot - 90, finalRot, easing);
+          ok = true;
+        }
+      }
+
+      if (preset === "fade-in" || preset === "fade-out" || preset === "rotate-in") {
+        var opacity = _findComponent(item, "Opacity") || _findComponent(item, "Opacidade");
+        if (opacity) {
+          var opParam = _findParam(opacity, "Opacity") || _findParam(opacity, "Opacidade");
+          if (opParam) {
+            if (!opParam.isTimeVarying()) opParam.setTimeVarying(true);
+            if (preset === "fade-out") {
+              opParam.addKey(_timeAt(clipEnd - dur));
+              opParam.setValueAtKey(_timeAt(clipEnd - dur), 100, true);
+              opParam.addKey(_timeAt(clipEnd));
+              opParam.setValueAtKey(_timeAt(clipEnd), 0, true);
+            } else {
+              opParam.addKey(_timeAt(clipStart));
+              opParam.setValueAtKey(_timeAt(clipStart), 0, true);
+              opParam.addKey(_timeAt(clipStart + dur));
+              opParam.setValueAtKey(_timeAt(clipStart + dur), 100, true);
+            }
+            ok = true;
+          }
+        }
+      }
+
+      if (ok) applied++;
+    }
+
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível aplicar a animação (parâmetro não encontrado).";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// A API de ComponentParam para listar keyframes existentes não é 100% consistente entre
+// versões do Premiere (numKeys pode ser propriedade, método, ou nem existir — daqui vem o
+// bug "não encontrei 2+ keyframes" mesmo com elas visíveis no Controle de Efeitos).
+// Esta função tenta várias formas conhecidas antes de desistir.
+function _getParamKeyTimes(param) {
+  var times = [];
+
+  try {
+    if (typeof param.numKeys === "number" && param.numKeys > 0 && typeof param.getKeyTime === "function") {
+      for (var i = 0; i < param.numKeys; i++) times.push(param.getKeyTime(i));
+      if (times.length > 0) return times;
+    }
+  } catch (e1) {}
+
+  try {
+    if (typeof param.numKeys === "function" && typeof param.getKeyTime === "function") {
+      var n2 = param.numKeys();
+      for (var j = 0; j < n2; j++) times.push(param.getKeyTime(j));
+      if (times.length > 0) return times;
+    }
+  } catch (e2) {}
+
+  try {
+    if (typeof param.getKeys === "function") {
+      var keys = param.getKeys();
+      if (keys && keys.length > 0) {
+        for (var k = 0; k < keys.length; k++) times.push(keys[k]);
+        return times;
+      }
+    }
+  } catch (e3) {}
+
+  try {
+    if (param.keys && param.keys.length > 0) {
+      for (var m = 0; m < param.keys.length; m++) times.push(param.keys[m]);
+      if (times.length > 0) return times;
+    }
+  } catch (e4) {}
+
+  return null;
+}
+
+// ---------- SUAVIZAR MOVIMENTO ----------
+// Suaviza (média móvel) as keyframes já existentes de Posição/Escala/Rotação.
+// Não é estabilização de imagem (isso exige o Warp Stabilizer, sem API de script).
+function _smoothParamKeyframes(param) {
+  if (!param.isTimeVarying || !param.isTimeVarying()) return false;
+
+  var times = _getParamKeyTimes(param);
+  if (!times || times.length < 3) return false;
+
+  var n = times.length;
+  var values = [];
+  for (var i = 0; i < n; i++) {
+    values.push(param.getValueAtKey(times[i]));
+  }
+
+  var isArr = values[0] instanceof Array;
+  for (var pass = 0; pass < 2; pass++) {
+    var next = values.slice();
+    for (var j = 1; j < n - 1; j++) {
+      if (isArr) {
+        next[j] = [
+          (values[j - 1][0] + values[j][0] + values[j + 1][0]) / 3,
+          (values[j - 1][1] + values[j][1] + values[j + 1][1]) / 3
+        ];
+      } else {
+        next[j] = (values[j - 1] + values[j] + values[j + 1]) / 3;
+      }
+    }
+    values = next;
+  }
+
+  for (var k = 1; k < n - 1; k++) {
+    param.setValueAtKey(times[k], values[k], true);
+  }
+  return true;
+}
+
+function applySmoothMotion() {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var smoothedClips = 0;
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      if (!motion) continue;
+
+      var any = false;
+      var names = ["Position", "Posição", "Scale", "Escala", "Rotation", "Rotação"];
+      for (var n = 0; n < names.length; n++) {
+        var p = _findParam(motion, names[n]);
+        if (p && _smoothParamKeyframes(p)) any = true;
+      }
+      if (any) smoothedClips++;
+    }
+
+    return smoothedClips > 0
+      ? "ok:" + smoothedClips + " clipe(s)"
+      : "erro:Nenhum clipe selecionado tem keyframes de Posição/Escala/Rotação (com 3+ pontos) para suavizar.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+var _PROP_PT_NAME = {
+  Position: "Posição",
+  Scale: "Escala",
+  Rotation: "Rotação",
+  Opacity: "Opacidade"
+};
+
+// Reformata a curva ENTRE a primeira e a última keyframe já existentes de cada
+// propriedade escolhida, usando a curva de Bézier desenhada no editor visual do painel.
+// propsJson: ex. ["Position","Scale"]   p1x/p1y/p2x/p2y: alças da curva (0..1, y pode passar disso para overshoot)
+function applyCurveToKeyframes(propsJson, p1x, p1y, p2x, p2y) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var props = JSON.parse(propsJson);
+    if (!props || props.length === 0) return "erro:Escolha ao menos uma propriedade.";
+
+    var bp1x = parseFloat(p1x), bp1y = parseFloat(p1y), bp2x = parseFloat(p2x), bp2y = parseFloat(p2y);
+    var applied = 0;
+    var skippedNoKeys = 0;
+    var usedFallback = false;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var motion = _findComponent(item, "Motion") || _findComponent(item, "Movimento");
+      var opacity = _findComponent(item, "Opacity") || _findComponent(item, "Opacidade");
+      var any = false;
+
+      for (var p = 0; p < props.length; p++) {
+        var propName = props[p];
+        var param = null;
+        if (propName === "Opacity") {
+          param = opacity ? (_findParam(opacity, "Opacity") || _findParam(opacity, "Opacidade")) : null;
+        } else if (motion) {
+          param = _findParam(motion, propName) || _findParam(motion, _PROP_PT_NAME[propName]);
+        }
+        if (!param || !param.isTimeVarying || !param.isTimeVarying()) continue;
+
+        var firstTime, lastTime, fromVal, toVal;
+        var times = _getParamKeyTimes(param);
+
+        if (times && times.length >= 2) {
+          times.sort(function (a, b) { return a.seconds - b.seconds; });
+          firstTime = times[0];
+          lastTime = times[times.length - 1];
+          fromVal = param.getValueAtKey(firstTime);
+          toVal = param.getValueAtKey(lastTime);
+        } else {
+          // Não deu pra listar as keyframes exatas nesta versão do Premiere — usa o
+          // início/fim do clipe como aproximação (o parâmetro já está animado).
+          firstTime = _timeAt(item.start.seconds);
+          lastTime = _timeAt(item.end.seconds);
+          fromVal = param.getValueAtTime(firstTime);
+          toVal = param.getValueAtTime(lastTime);
+          usedFallback = true;
+        }
+
+        var startSec = firstTime.seconds;
+        var durSec = lastTime.seconds - startSec;
+        if (durSec <= 0) continue;
+
+        _bakeBezierKeyframes(param, startSec, durSec, fromVal, toVal, bp1x, bp1y, bp2x, bp2y);
+        any = true;
+      }
+
+      if (any) applied++;
+      else skippedNoKeys++;
+    }
+
+    if (applied > 0) {
+      var msg = "ok:" + applied + " clipe(s)";
+      if (usedFallback) msg += " (usei início/fim do clipe como aproximação — não consegui listar as keyframes exatas nesta versão do Premiere)";
+      return msg;
+    }
+    return "erro:Nenhuma propriedade escolhida está animada (com Time-Varying Stopwatch ativado) nos clipes selecionados.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- COR ----------
+// Ajusta parâmetros do efeito "Lumetri Color" já aplicado ao clipe (não adiciona o efeito,
+// a API de script do Premiere não permite inserir efeitos novos — aplique o Lumetri Color
+// manualmente uma vez pelo painel de Efeitos antes de usar esta função).
+// preset: "quente" | "frio" | "contraste" | "vivido"
+function applyColorPreset(preset, amount) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var amt = parseFloat(amount);
+    var applied = 0;
+    var missingLumetri = 0;
+
+    var targets = {
+      "quente": [{ name: "Temperature", delta: amt }],
+      "frio": [{ name: "Temperature", delta: -amt }],
+      "contraste": [{ name: "Contrast", delta: amt }],
+      "vivido": [{ name: "Saturation", delta: amt }]
+    };
+    var changes = targets[preset];
+    if (!changes) return "erro:Predefinição de cor inválida.";
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var lumetri = _findComponent(item, "Lumetri Color");
+      if (!lumetri) {
+        missingLumetri++;
+        continue;
+      }
+
+      var okAny = false;
+      for (var c = 0; c < changes.length; c++) {
+        var param = _findParam(lumetri, changes[c].name);
+        if (!param) continue;
+        var current = param.getValue();
+        if (param.isTimeVarying()) param.setTimeVarying(false);
+        param.setValue(current + changes[c].delta, true);
+        okAny = true;
+      }
+      if (okAny) applied++;
+    }
+
+    if (applied === 0 && missingLumetri > 0) {
+      return "erro:Nenhum clipe selecionado tem o efeito 'Lumetri Color' aplicado. Adicione-o pelo painel Efeitos do Premiere e tente de novo.";
+    }
+    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível ajustar a cor.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- B-ROLL EM LOTE ----------
+// Insere, em rodízio, os clipes de um bin do painel de projeto em cada marcador da
+// sequência, numa trilha de vídeo escolhida.
+function _isBin(item) {
+  try {
+    return item.type === ProjectItemType.BIN;
+  } catch (e) {
+    return item.type === 2;
+  }
+}
+
+function _isClip(item) {
+  try {
+    return item.type === ProjectItemType.CLIP;
+  } catch (e) {
+    return item.type === 1;
+  }
+}
+
+function _findBinByName(item, name) {
+  for (var i = 0; i < item.children.numItems; i++) {
+    var child = item.children[i];
+    if (_isBin(child) && child.name === name) return child;
+    if (_isBin(child)) {
+      var nested = _findBinByName(child, name);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function applyBatchBRoll(binName, trackIndex) {
+  try {
+    var seq = _requireSequence();
+    var bin = _findBinByName(app.project.rootItem, binName);
+    if (!bin) return "erro:Bin '" + binName + "' não encontrado no painel de Projeto.";
+
+    var clips = [];
+    for (var i = 0; i < bin.children.numItems; i++) {
+      var child = bin.children[i];
+      if (_isClip(child)) clips.push(child);
+    }
+    if (clips.length === 0) return "erro:O bin '" + binName + "' não contém clipes.";
+
+    var tIdx = parseInt(trackIndex, 10) - 1;
+    if (tIdx < 0 || tIdx >= seq.videoTracks.numTracks) return "erro:Trilha de vídeo inválida.";
+    var track = seq.videoTracks[tIdx];
+
+    var markerTimes = [];
+    var m = seq.markers.getFirstMarker();
+    while (m) {
+      markerTimes.push(m.start.seconds);
+      m = seq.markers.getNextMarker(m);
+    }
+    if (markerTimes.length === 0) {
+      return "erro:Nenhum marcador na sequência. Crie marcadores (tecla M) nos pontos onde o b-roll deve entrar.";
+    }
+    markerTimes.sort(function (a, b) { return a - b; });
+
+    var applied = 0;
+    for (var k = 0; k < markerTimes.length; k++) {
+      var clipItem = clips[k % clips.length];
+      try {
+        track.overwriteClip(clipItem, markerTimes[k]);
+        applied++;
+      } catch (e2) {
+        // ignora e segue pro próximo marcador
+      }
+    }
+
+    return applied > 0 ? "ok:" + applied + " b-roll(s) inserido(s)" : "erro:Não foi possível inserir os clipes de b-roll.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- LEGENDAS ----------
+function getPlayheadSeconds() {
+  try {
+    var seq = _requireSequence();
+    return "ok:" + seq.getPlayerPosition().seconds;
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+function _findProjectItemByName(item, name) {
+  for (var i = 0; i < item.children.numItems; i++) {
+    var child = item.children[i];
+    if (child.name === name) return child;
+    if (child.children && child.children.numItems > 0) {
+      var nested = _findProjectItemByName(child, name);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function _findClipAtStart(track, seconds) {
+  for (var c = 0; c < track.clips.numItems; c++) {
+    var clip = track.clips[c];
+    if (Math.abs(clip.start.seconds - seconds) < 0.05) return clip;
+  }
+  return null;
+}
+
+// Heurística: seta o primeiro parâmetro de texto encontrado nos componentes do clipe
+// (funciona para o componente "Source Text" de um Gráfico do Essential Graphics).
+function _setFirstStringParam(item, text) {
+  for (var c = 0; c < item.components.numItems; c++) {
+    var comp = item.components[c];
+    for (var p = 0; p < comp.properties.numItems; p++) {
+      var prop = comp.properties[p];
+      try {
+        var val = prop.getValue();
+        if (typeof val === "string") {
+          prop.setValue(text, true);
+          return true;
+        }
+      } catch (e) {
+        // parâmetro não legível/tipo diferente, tenta o próximo
+      }
+    }
+  }
+  return false;
+}
+
+// cuesJson: [{start, end, text}]  templateName: nome do item no painel de Projeto
+// (um Gráfico do Essential Graphics com uma camada de texto, criado manualmente uma vez)
+function generateCaptionsOnTimeline(cuesJson, templateName, trackIndex) {
+  try {
+    var seq = _requireSequence();
+    var cues = JSON.parse(cuesJson);
+    if (!cues || cues.length === 0) return "erro:Nenhuma legenda para gerar.";
+
+    var template = _findProjectItemByName(app.project.rootItem, templateName);
+    if (!template) {
+      return "erro:Clipe modelo '" + templateName + "' não encontrado no painel de Projeto. Crie um Gráfico (Novo Item > Gráficos Essenciais) com uma camada de texto e nomeie-o exatamente assim.";
+    }
+
+    var tIdx = parseInt(trackIndex, 10) - 1;
+    if (tIdx < 0 || tIdx >= seq.videoTracks.numTracks) return "erro:Trilha de vídeo inválida.";
+    var track = seq.videoTracks[tIdx];
+
+    var applied = 0;
+    var textFailed = 0;
+
+    for (var i = 0; i < cues.length; i++) {
+      var cue = cues[i];
+      var inserted = track.insertClip(template, cue.start);
+      if (!inserted) continue;
+
+      var item = _findClipAtStart(track, cue.start);
+      if (!item) continue;
+
+      try {
+        item.end = _timeAt(cue.end);
+      } catch (eEnd) {
+        // se não puder ajustar o out point, mantém a duração padrão do modelo
+      }
+
+      var textSet = _setFirstStringParam(item, cue.text);
+      if (!textSet) textFailed++;
+
+      applied++;
+    }
+
+    var msg = "ok:" + applied + " legenda(s) inserida(s)";
+    if (textFailed > 0) {
+      msg += " (" + textFailed + " sem texto ajustado automaticamente — edite o texto manualmente nesses clipes)";
+    }
+    return msg;
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// ---------- CORTE AUTOMÁTICO DE SILÊNCIO ----------
+// A detecção/corte roda no Node.js do painel (ffmpeg); estas funções só entregam
+// os dados do clipe selecionado e, depois, importam + posicionam o arquivo já cortado.
+
+function getProjectDirectory() {
+  try {
+    var path = app.project.path;
+    if (!path) return "erro:Salve o projeto do Premiere (Ctrl+S) antes de usar o corte automático de silêncio.";
+    var lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+    return "ok:" + path.substring(0, lastSlash);
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+// Dados do PRIMEIRO clipe (vídeo ou áudio) selecionado na timeline.
+function getClipSourceForSilenceCut() {
+  try {
+    var seq = _requireSequence();
+    var videoItems = _getSelectedVideoItems(seq);
+    var audioItems = _getSelectedAudioItems(seq);
+    var item = videoItems.length > 0 ? videoItems[0] : audioItems[0];
+    if (!item) return "erro:Selecione um clipe de vídeo ou áudio na timeline.";
+
+    var path = "";
+    try {
+      path = item.projectItem.getMediaPath();
+    } catch (ePath) {}
+    if (!path) return "erro:Não consegui encontrar o arquivo de mídia deste clipe.";
+
+    var sourceIn = null, sourceOut = null;
+    try {
+      if (typeof app.enableQE === "function") {
+        app.enableQE();
+        var qeItem = _findQeItemGeneric(seq, item, item.mediaType);
+        if (qeItem) {
+          sourceIn = _qeTicksToSeconds(qeItem.inPoint);
+          sourceOut = _qeTicksToSeconds(qeItem.outPoint);
+        }
+      }
+    } catch (eQe) {
+      sourceIn = null;
+      sourceOut = null;
+    }
+
+    var data = {
+      path: path,
+      mediaType: item.mediaType,
+      trackIndex: _findTrackIndexOf(seq, item),
+      timelineStart: item.start.seconds,
+      timelineEnd: item.end.seconds,
+      sourceIn: sourceIn,
+      sourceOut: sourceOut
+    };
+    return "ok:" + JSON.stringify(data);
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
+function _findProjectItemByPath(item, targetPath) {
+  for (var i = 0; i < item.children.numItems; i++) {
+    var child = item.children[i];
+    try {
+      if (typeof child.getMediaPath === "function" && child.getMediaPath() === targetPath) return child;
+    } catch (eGet) {}
+    try {
+      if (child.children && child.children.numItems > 0) {
+        var nested = _findProjectItemByPath(child, targetPath);
+        if (nested) return nested;
+      }
+    } catch (eChildren) {}
+  }
+  return null;
+}
+
+// Importa o arquivo já cortado (gerado pelo ffmpeg) e insere na timeline.
+function importAndPlaceCutFile(filePath, mediaType, trackIndex, timelineStartSeconds) {
+  try {
+    var seq = _requireSequence();
+    app.project.importFiles([filePath], true, app.project.rootItem, false);
+
+    var imported = _findProjectItemByPath(app.project.rootItem, filePath);
+    if (!imported) {
+      return "erro:O arquivo cortado foi salvo em " + filePath + " e importado, mas não consegui localizá-lo automaticamente no painel de Projeto para inserir na timeline. Arraste-o manualmente.";
+    }
+
+    var tIdx = parseInt(trackIndex, 10) - 1;
+    var tracks = mediaType === "Audio" ? seq.audioTracks : seq.videoTracks;
+    if (tIdx < 0 || tIdx >= tracks.numTracks) return "erro:Trilha de destino inválida.";
+    var track = tracks[tIdx];
+
+    var inserted = track.insertClip(imported, parseFloat(timelineStartSeconds));
+    return inserted
+      ? "ok:1 clipe cortado inserido na timeline"
+      : "erro:O arquivo foi cortado e importado, mas a inserção automática na timeline falhou — arraste-o manualmente do painel de Projeto.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}

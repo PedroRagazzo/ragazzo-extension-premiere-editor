@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ragazzo Editor - Efeitos</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Efeitos</h1>
+    <p>Legendas, zoom, velocidade, cor e mais para o clipe selecionado</p>
+  </header>
+
+  <main>
+    <div class="effect-card open" id="captions-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9.5L5 19v-3H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/>
+            <circle class="icon-blink" style="animation-delay:0s" cx="8" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
+            <circle class="icon-blink" style="animation-delay:.2s" cx="12" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
+            <circle class="icon-blink" style="animation-delay:.4s" cx="16" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <span class="effect-title">Legendas</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Crie as legendas aqui (manual ou importando um .srt) e gere na timeline. Para animar a entrada/saída, gere as legendas e depois selecione os clipes gerados no card "Animar clipe/objeto".</p>
+
+          <div id="caption-list"></div>
+
+          <div class="btn-group">
+            <button id="caption-add">+ No playhead</button>
+            <button id="caption-import">Importar .srt</button>
+            <button id="caption-export">Exportar .srt</button>
+          </div>
+          <input type="file" id="caption-file-input" accept=".srt,.vtt,.txt" style="display:none" />
+
+          <div class="row">
+            <label for="caption-template">Nome do modelo (Gráfico)</label>
+            <input type="text" id="caption-template" value="Legenda Template" />
+          </div>
+          <div class="row">
+            <label for="caption-track">Trilha de vídeo (nº)</label>
+            <input type="number" id="caption-track" value="3" min="1" max="20" />
+          </div>
+          <button class="primary" id="caption-generate">Gerar legendas na timeline</button>
+          <p class="hint">Requer um clipe de Gráficos Essenciais com uma camada de texto, criado uma vez no Premiere com esse nome exato — a API de script não permite criar títulos do zero. A duração de cada legenda tenta seguir o tempo definido aqui; se o Premiere ignorar o ajuste, corrija manualmente na timeline.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-zoom-group">
+            <circle cx="10.5" cy="10.5" r="6"/>
+            <line x1="15" y1="15" x2="20.5" y2="20.5"/>
+            <line class="icon-fade" x1="10.5" y1="7.5" x2="10.5" y2="13.5"/>
+            <line class="icon-fade" x1="7.5" y1="10.5" x2="13.5" y2="10.5"/>
+          </svg>
+        </span>
+        <span class="effect-title">Zoom</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Anima a Escala do clipe do início ao fim, criando um efeito de aproximação (in) ou afastamento (out).</p>
+          <div class="row slider-row">
+            <label for="zoom-amount">Intensidade</label>
+            <input type="range" id="zoom-amount-range" class="slider" min="1" max="200" step="1" value="25" />
+            <input type="number" id="zoom-amount" class="slider-number" value="25" min="1" max="500" />
+          </div>
+          <div class="row">
+            <label for="zoom-easing">Curva</label>
+            <select id="zoom-easing">
+              <option value="linear">Linear</option>
+              <option value="easeOut" selected>Suave (desacelera)</option>
+              <option value="easeIn">Suave (acelera)</option>
+              <option value="easeInOut">Suave nas pontas</option>
+            </select>
+          </div>
+          <div class="btn-group">
+            <button id="zoom-in">Zoom in</button>
+            <button id="zoom-out">Zoom out</button>
+          </div>
+
+          <div class="preset-bar">
+            <div id="zoom-preset-list" class="preset-list"></div>
+            <div class="row" id="zoom-preset-new-row" style="display:none">
+              <input type="text" id="zoom-preset-name" placeholder="Nome do preset" style="flex:1;width:auto" />
+              <button id="zoom-preset-confirm">Salvar</button>
+            </div>
+            <button id="zoom-preset-save">+ Salvar preset atual</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline class="icon-ff" style="animation-delay:0s" points="4 6 10 12 4 18"/>
+            <polyline class="icon-ff" style="animation-delay:.2s" points="12 6 18 12 12 18"/>
+          </svg>
+        </span>
+        <span class="effect-title">Velocidade</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Muda a velocidade de reprodução do clipe (100% = original).</p>
+          <div class="row slider-row">
+            <label for="speed-value">Velocidade</label>
+            <input type="range" id="speed-value-range" class="slider" min="10" max="400" step="5" value="100" />
+            <input type="number" id="speed-value" class="slider-number" value="100" min="1" max="10000" />
+          </div>
+          <button class="primary" id="apply-speed">Aplicar velocidade</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.5" y="3.5" width="17" height="17" rx="1.5" stroke-dasharray="2 2"/>
+            <circle class="icon-align-dot" cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <span class="effect-title">Alinhamento</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Reposiciona o clipe em relação ao quadro da sequência.</p>
+          <div class="btn-group">
+            <button data-align="left">Esquerda</button>
+            <button data-align="center">Centro H</button>
+            <button data-align="right">Direita</button>
+            <button data-align="top">Topo</button>
+            <button data-align="middle">Centro V</button>
+            <button data-align="bottom">Base</button>
+          </div>
+
+          <p class="hint section-sep">Copie Posição/Escala/Rotação/Opacidade de um clipe e aplique em outros.</p>
+          <div class="btn-group">
+            <button id="motion-copy">Copiar</button>
+            <button id="motion-paste">Colar</button>
+            <button id="motion-reset">Zerar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path class="icon-crop-a" d="M8 3.5v10a1.5 1.5 0 0 0 1.5 1.5H20"/>
+            <path class="icon-crop-b" d="M16 20.5v-10A1.5 1.5 0 0 0 14.5 9H4"/>
+          </svg>
+        </span>
+        <span class="effect-title">Recortar</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <div class="row slider-row">
+            <label for="crop-amount">Intensidade</label>
+            <input type="range" id="crop-amount-range" class="slider" min="1" max="150" step="1" value="20" />
+            <input type="number" id="crop-amount" class="slider-number" value="20" min="1" max="300" />
+          </div>
+          <div class="row">
+            <label for="crop-anchor-x">Âncora horizontal</label>
+            <select id="crop-anchor-x">
+              <option value="left">Esquerda</option>
+              <option value="center" selected>Centro</option>
+              <option value="right">Direita</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="crop-anchor-y">Âncora vertical</label>
+            <select id="crop-anchor-y">
+              <option value="top">Topo</option>
+              <option value="middle" selected>Meio</option>
+              <option value="bottom">Base</option>
+            </select>
+          </div>
+          <button class="primary" id="apply-crop">Aplicar corte</button>
+          <p class="hint">Assume que o clipe já preenche o quadro (Escala 100%).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/>
+            <line x1="12" y1="3.5" x2="12" y2="20.5"/>
+            <rect class="icon-split-fill" x="12" y="3.5" width="8.5" height="17"/>
+          </svg>
+        </span>
+        <span class="effect-title">Tela dividida</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Selecione 2 clipes (ou 4, para grade) em trilhas de vídeo diferentes, sobrepostos no tempo.</p>
+          <div class="btn-group">
+            <button data-split="2h">2 lado a lado</button>
+            <button data-split="2v">2 empilhados</button>
+            <button data-split="4grid">Grade 2x2</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect class="icon-cascade" style="animation-delay:0s" x="4" y="4" width="11" height="11" rx="1.5"/>
+            <rect class="icon-cascade" style="animation-delay:.2s" x="7.5" y="7.5" width="11" height="11" rx="1.5"/>
+            <rect class="icon-cascade" style="animation-delay:.4s" x="11" y="11" width="11" height="11" rx="1.5"/>
+          </svg>
+        </span>
+        <span class="effect-title">Distribuir / Cascata</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Organiza vários clipes selecionados (em trilhas diferentes) automaticamente — sem precisar montar posição/escala um por um.</p>
+
+          <p class="hint section-sep"><strong>Distribuir:</strong> divide o quadro em N partes iguais.</p>
+          <div class="btn-group">
+            <button data-distribute="row">Lado a lado</button>
+            <button data-distribute="column">Empilhado</button>
+          </div>
+
+          <p class="hint section-sep"><strong>Cascata:</strong> empilha em camadas (PIP), a partir da posição/escala do primeiro clipe selecionado.</p>
+          <div class="row slider-row">
+            <label for="cascade-scale-step">Passo de escala</label>
+            <input type="range" id="cascade-scale-step-range" class="slider" min="1" max="30" step="1" value="10" />
+            <input type="number" id="cascade-scale-step" class="slider-number" value="10" min="1" max="80" />
+          </div>
+          <div class="row slider-row">
+            <label for="cascade-offset-step">Passo de deslocamento</label>
+            <input type="range" id="cascade-offset-step-range" class="slider" min="1" max="30" step="1" value="8" />
+            <input type="number" id="cascade-offset-step" class="slider-number" value="8" min="1" max="50" />
+          </div>
+          <div class="row">
+            <label for="cascade-corner">Direção</label>
+            <select id="cascade-corner">
+              <option value="top-left">↘ a partir do topo-esquerda</option>
+              <option value="top-right">↙ a partir do topo-direita</option>
+              <option value="bottom-left">↗ a partir da base-esquerda</option>
+              <option value="bottom-right">↖ a partir da base-direita</option>
+            </select>
+          </div>
+          <button class="primary" id="apply-cascade">Aplicar cascata</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="15" x2="3" y2="9"/>
+            <line x1="6" y1="17" x2="6" y2="7"/>
+            <line x1="9" y1="14" x2="9" y2="10"/>
+            <rect class="icon-cutgap" x="10.5" y="10.5" width="3" height="3" fill="currentColor" stroke="none"/>
+            <line x1="15" y1="14" x2="15" y2="10"/>
+            <line x1="18" y1="17" x2="18" y2="7"/>
+            <line x1="21" y1="15" x2="21" y2="9"/>
+          </svg>
+        </span>
+        <span class="effect-title">Corte de silêncio</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Detecta pausas/silêncio no áudio do clipe selecionado (via ffmpeg) e gera automaticamente uma versão cortada, já inserida na timeline. O clipe original não é alterado.</p>
+
+          <div class="row slider-row">
+            <label for="silence-threshold">Limiar de silêncio</label>
+            <input type="range" id="silence-threshold-range" class="slider" min="-60" max="-10" step="1" value="-30" />
+            <input type="number" id="silence-threshold" class="slider-number" value="-30" min="-60" max="-10" />
+          </div>
+          <div class="row slider-row">
+            <label for="silence-min-duration">Pausa mínima (s)</label>
+            <input type="range" id="silence-min-duration-range" class="slider" min="0.1" max="2" step="0.05" value="0.4" />
+            <input type="number" id="silence-min-duration" class="slider-number" value="0.4" min="0.05" max="5" step="0.05" />
+          </div>
+          <div class="row slider-row">
+            <label for="silence-padding">Folga (ms)</label>
+            <input type="range" id="silence-padding-range" class="slider" min="0" max="400" step="10" value="120" />
+            <input type="number" id="silence-padding" class="slider-number" value="120" min="0" max="1000" step="10" />
+          </div>
+          <div class="row">
+            <label for="silence-track">Trilha de destino (nº)</label>
+            <input type="number" id="silence-track" min="1" max="20" placeholder="auto" />
+          </div>
+
+          <button class="primary" id="apply-silence-cut">Detectar e cortar silêncio</button>
+          <p class="hint">Requer o projeto salvo (o arquivo cortado é gravado na mesma pasta do projeto). Pode demorar alguns segundos a minutos, dependendo do tamanho do clipe.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line class="icon-bar" style="animation-delay:0s" x1="6" y1="17" x2="6" y2="7"/>
+            <line class="icon-bar" style="animation-delay:.15s" x1="12" y1="17" x2="12" y2="4"/>
+            <line class="icon-bar" style="animation-delay:.3s" x1="18" y1="17" x2="18" y2="9"/>
+          </svg>
+        </span>
+        <span class="effect-title">Nivelar voz</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <div class="row">
+            <label for="target-lufs">Alvo (LUFS)</label>
+            <input type="number" id="target-lufs" value="-16" min="-40" max="0" />
+          </div>
+          <button class="primary" id="apply-level">Nivelar clipes selecionados</button>
+          <p class="hint">Mede o loudness de cada clipe de áudio selecionado (via ffmpeg, do arquivo de mídia inteiro) e ajusta o ganho para o alvo.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line class="icon-duck-a" x1="8" y1="18" x2="8" y2="6"/>
+            <line class="icon-duck-b" x1="16" y1="18" x2="16" y2="6"/>
+          </svg>
+        </span>
+        <span class="effect-title">Áudio Intercalado</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Abaixa a música automaticamente onde houver clipes na trilha de voz (ducking), com fade suave.</p>
+          <div class="row">
+            <label for="duck-voice-track">Trilha de voz (nº)</label>
+            <input type="number" id="duck-voice-track" value="1" min="1" max="20" />
+          </div>
+          <div class="row">
+            <label for="duck-music-track">Trilha de música (nº)</label>
+            <input type="number" id="duck-music-track" value="2" min="1" max="20" />
+          </div>
+          <div class="row slider-row">
+            <label for="duck-amount">Redução</label>
+            <input type="range" id="duck-amount-range" class="slider" min="-40" max="0" step="1" value="-12" />
+            <input type="number" id="duck-amount" class="slider-number" value="-12" min="-40" max="0" />
+          </div>
+          <div class="row slider-row">
+            <label for="duck-fade">Fade</label>
+            <input type="range" id="duck-fade-range" class="slider" min="0.05" max="2" step="0.05" value="0.4" />
+            <input type="number" id="duck-fade" class="slider-number" value="0.4" min="0.05" max="5" step="0.05" />
+          </div>
+          <button class="primary" id="apply-duck">Aplicar ducking</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect class="icon-slide-box" x="4" y="8" width="8" height="8" rx="1.5"/>
+            <line x1="15" y1="12" x2="20.5" y2="12"/>
+            <polyline points="18 9.5 20.5 12 18 14.5"/>
+          </svg>
+        </span>
+        <span class="effect-title">Animar clipe/objeto</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <div class="row">
+            <label for="anim-preset">Predefinição</label>
+            <select id="anim-preset">
+              <option value="slide-left">Deslizar da esquerda</option>
+              <option value="slide-right">Deslizar da direita</option>
+              <option value="slide-top">Deslizar de cima</option>
+              <option value="slide-bottom">Deslizar de baixo</option>
+              <option value="fade-in">Fade in</option>
+              <option value="fade-out">Fade out</option>
+              <option value="pop">Pop (escala)</option>
+              <option value="rotate-in">Girar + fade in</option>
+            </select>
+          </div>
+          <div class="row slider-row">
+            <label for="anim-duration">Duração</label>
+            <input type="range" id="anim-duration-range" class="slider" min="0.1" max="3" step="0.1" value="0.6" />
+            <input type="number" id="anim-duration" class="slider-number" value="0.6" min="0.1" max="10" step="0.1" />
+          </div>
+          <div class="row">
+            <label for="anim-easing">Curva</label>
+            <select id="anim-easing">
+              <option value="easeOut" selected>Suave (desacelera)</option>
+              <option value="easeIn">Suave (acelera)</option>
+              <option value="easeInOut">Suave nas pontas</option>
+              <option value="linear">Linear</option>
+            </select>
+          </div>
+          <p class="hint">O preset "Pop" sempre usa uma curva com leve exagero (overshoot), ignorando essa escolha.</p>
+          <button class="primary" id="apply-anim">Aplicar animação</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-hue">
+            <circle cx="12" cy="12" r="7"/>
+            <path d="M12 5a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" opacity=".35"/>
+          </svg>
+        </span>
+        <span class="effect-title">Cor</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe (a API do Premiere não permite adicionar efeitos novos via script).</p>
+          <div class="row">
+            <label for="color-preset">Predefinição</label>
+            <select id="color-preset">
+              <option value="quente">Mais quente</option>
+              <option value="frio">Mais frio</option>
+              <option value="contraste">Mais contraste</option>
+              <option value="vivido">Mais vívido</option>
+            </select>
+          </div>
+          <div class="row slider-row">
+            <label for="color-amount">Intensidade</label>
+            <input type="range" id="color-amount-range" class="slider" min="1" max="50" step="1" value="15" />
+            <input type="number" id="color-amount" class="slider-number" value="15" min="1" max="100" />
+          </div>
+          <button class="primary" id="apply-color">Aplicar cor</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path class="icon-wave-jagged" d="M3 16l4-8 4 8 4-8 4 8 3-6"/>
+            <path class="icon-wave-smooth" d="M3 13c3-5 6-5 9 0s6 5 9 0" />
+          </svg>
+        </span>
+        <span class="effect-title">Suavizar movimento</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Redesenha a curva entre a primeira e a última keyframe já existentes na propriedade escolhida. Arraste as alças (pontos coloridos) para moldar a curva, ou clique num preset abaixo. Não remove tremor de câmera — para isso use o Warp Stabilizer nativo do Premiere.</p>
+
+          <div class="prop-checks">
+            <label class="prop-check"><input type="checkbox" id="curve-prop-position" checked /> Posição</label>
+            <label class="prop-check"><input type="checkbox" id="curve-prop-scale" checked /> Escala</label>
+            <label class="prop-check"><input type="checkbox" id="curve-prop-rotation" /> Rotação</label>
+            <label class="prop-check"><input type="checkbox" id="curve-prop-opacity" /> Opacidade</label>
+          </div>
+
+          <div id="smooth-curve-editor"></div>
+          <div id="smooth-curve-presets" class="curve-preset-list"></div>
+
+          <button class="primary" id="apply-curve">Aplicar curva</button>
+          <p class="hint">Requer que a propriedade já tenha 2 ou mais keyframes no Controle de Efeitos do Premiere.</p>
+
+          <p class="hint section-sep">Ou, sem mexer em curva: suaviza (média móvel) todas as keyframes existentes de uma vez.</p>
+          <button id="apply-smooth">Suavizar automaticamente</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="effect-card">
+      <button type="button" class="effect-header">
+        <span class="effect-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="4" width="15" height="4.2" rx="1"/>
+            <rect x="4.5" y="10" width="15" height="4.2" rx="1"/>
+            <rect class="icon-slide-box" x="4.5" y="16" width="15" height="4.2" rx="1"/>
+          </svg>
+        </span>
+        <span class="effect-title">B-roll em lote</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="effect-body">
+        <div class="effect-body-inner">
+          <p class="hint">Insere os clipes de um bin do painel de Projeto, em rodízio, em cada marcador (tecla M) da sequência.</p>
+          <div class="row">
+            <label for="broll-bin">Nome do bin</label>
+            <input type="text" id="broll-bin" value="B-Roll" />
+          </div>
+          <div class="row">
+            <label for="broll-track">Trilha de vídeo (nº)</label>
+            <input type="number" id="broll-track" value="2" min="1" max="20" />
+          </div>
+          <button class="primary" id="apply-broll">Inserir b-roll nos marcadores</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="status"><span class="spinner"></span><span class="status-text"></span></div>
+
+  <script src="js/cep-bridge.js"></script>
+  <script src="js/loudness.js"></script>
+  <script src="js/silence-cut.js"></script>
+  <script src="js/captions.js"></script>
+  <script src="js/curve-editor.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
