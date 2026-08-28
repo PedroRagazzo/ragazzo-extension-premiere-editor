@@ -33,6 +33,13 @@ function _timeAt(seconds) {
 var _POS_CENTER_X = 0.5;
 var _POS_CENTER_Y = 0.5;
 
+// Valores multi-dimensionais (Posição, Ponto de Ancoragem...) chegam como
+// arrays vindos do lado nativo do Premiere. `instanceof Array` não é confiável
+// para objetos que cruzam essa fronteira, então checamos a forma.
+function _isArrayLike(v) {
+  return v !== null && typeof v === "object" && typeof v.length === "number";
+}
+
 // Curvas de easing (equações clássicas de Robert Penner, domínio público).
 // easing: "linear" | "easeIn" | "easeOut" | "easeInOut" | "back"
 function _ease(easing, t) {
@@ -88,7 +95,7 @@ function _bezierEase(p1x, p1y, p2x, p2y, x) {
 function _bakeBezierKeyframes(param, startSeconds, durationSeconds, fromValue, toValue, p1x, p1y, p2x, p2y, steps) {
   if (!param.isTimeVarying()) param.setTimeVarying(true);
   steps = steps || 16;
-  var isArr = fromValue instanceof Array;
+  var isArr = _isArrayLike(fromValue);
 
   for (var i = 0; i <= steps; i++) {
     var x = i / steps;
@@ -108,7 +115,7 @@ function _bakeBezierKeyframes(param, startSeconds, durationSeconds, fromValue, t
 function _bakeEasedKeyframes(param, startSeconds, durationSeconds, fromValue, toValue, easing, steps) {
   if (!param.isTimeVarying()) param.setTimeVarying(true);
   steps = steps || 14;
-  var isArr = fromValue instanceof Array;
+  var isArr = _isArrayLike(fromValue);
 
   for (var i = 0; i <= steps; i++) {
     var t = i / steps;
@@ -900,46 +907,56 @@ function applyAnimateClip(preset, durationSeconds, easing) {
   }
 }
 
-// A API de ComponentParam para listar keyframes existentes não é 100% consistente entre
-// versões do Premiere (numKeys pode ser propriedade, método, ou nem existir — daqui vem o
-// bug "não encontrei 2+ keyframes" mesmo com elas visíveis no Controle de Efeitos).
-// Esta função tenta várias formas conhecidas antes de desistir.
+// Lista os tempos (em SEGUNDOS) das keyframes existentes de um parâmetro.
+//
+// getKeys() é a API correta e retorna um array de objetos Time — foi essa a
+// causa do bug "não encontrei 2+ keyframes" mesmo com elas visíveis no
+// Controle de Efeitos: antes tentávamos numKeys/getKeyTime, que não existem.
+// As outras formas ficam como rede de segurança para versões antigas.
 function _getParamKeyTimes(param) {
   var times = [];
-
-  try {
-    if (typeof param.numKeys === "number" && param.numKeys > 0 && typeof param.getKeyTime === "function") {
-      for (var i = 0; i < param.numKeys; i++) times.push(param.getKeyTime(i));
-      if (times.length > 0) return times;
-    }
-  } catch (e1) {}
-
-  try {
-    if (typeof param.numKeys === "function" && typeof param.getKeyTime === "function") {
-      var n2 = param.numKeys();
-      for (var j = 0; j < n2; j++) times.push(param.getKeyTime(j));
-      if (times.length > 0) return times;
-    }
-  } catch (e2) {}
+  var i;
 
   try {
     if (typeof param.getKeys === "function") {
       var keys = param.getKeys();
       if (keys && keys.length > 0) {
-        for (var k = 0; k < keys.length; k++) times.push(keys[k]);
+        for (i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          times.push((k && typeof k.seconds === "number") ? k.seconds : Number(k));
+        }
         return times;
       }
     }
-  } catch (e3) {}
+  } catch (e1) {}
 
   try {
-    if (param.keys && param.keys.length > 0) {
-      for (var m = 0; m < param.keys.length; m++) times.push(param.keys[m]);
+    if (typeof param.numKeys === "number" && param.numKeys > 0 && typeof param.getKeyTime === "function") {
+      for (i = 0; i < param.numKeys; i++) times.push(param.getKeyTime(i).seconds);
       if (times.length > 0) return times;
     }
-  } catch (e4) {}
+  } catch (e2) {}
+
+  try {
+    if (typeof param.numKeys === "function" && typeof param.getKeyTime === "function") {
+      var n = param.numKeys();
+      for (i = 0; i < n; i++) times.push(param.getKeyTime(i).seconds);
+      if (times.length > 0) return times;
+    }
+  } catch (e3) {}
 
   return null;
+}
+
+// O Premiere exige um OBJETO Time nos setters de keyframe — passar um Number
+// cru vira no-op silencioso. Todo tempo passado a addKey/setValueAtKey/
+// removeKeyRange/setInterpolationTypeAtKey/getValueAtKey deve vir daqui.
+function _kfSupported(param) {
+  try {
+    return typeof param.areKeyframesSupported !== "function" || param.areKeyframesSupported();
+  } catch (e) {
+    return true;
+  }
 }
 
 // ---------- SUAVIZAR MOVIMENTO ----------
@@ -950,14 +967,15 @@ function _smoothParamKeyframes(param) {
 
   var times = _getParamKeyTimes(param);
   if (!times || times.length < 3) return false;
+  times.sort(function (a, b) { return a - b; });
 
   var n = times.length;
   var values = [];
   for (var i = 0; i < n; i++) {
-    values.push(param.getValueAtKey(times[i]));
+    values.push(param.getValueAtKey(_timeAt(times[i])));
   }
 
-  var isArr = values[0] instanceof Array;
+  var isArr = _isArrayLike(values[0]);
   for (var pass = 0; pass < 2; pass++) {
     var next = values.slice();
     for (var j = 1; j < n - 1; j++) {
@@ -974,7 +992,7 @@ function _smoothParamKeyframes(param) {
   }
 
   for (var k = 1; k < n - 1; k++) {
-    param.setValueAtKey(times[k], values[k], true);
+    param.setValueAtKey(_timeAt(times[k]), values[k], true);
   }
   return true;
 }
@@ -1015,10 +1033,40 @@ var _PROP_PT_NAME = {
   Opacity: "Opacidade"
 };
 
+// Escreve uma keyframe com valor, forçando interpolação linear. As amostras já
+// descrevem a curva ponto a ponto, então qualquer suavização que o Premiere
+// aplicasse por conta própria distorceria o desenho feito no editor.
+function _writeBakedKey(param, seconds, value) {
+  var t = _timeAt(seconds);
+  param.addKey(t);
+  param.setValueAtKey(t, value, true);
+  try { param.setInterpolationTypeAtKey(t, 0, true); } catch (e) {}
+}
+
+// Interpola entre dois valores (número ou array) por um fator de fase 0..1.
+function _lerpValue(fromVal, toVal, phase) {
+  if (_isArrayLike(fromVal)) {
+    var out = [];
+    for (var d = 0; d < fromVal.length; d++) {
+      var a = Number(fromVal[d]);
+      var b = Number(_isArrayLike(toVal) ? toVal[d] : toVal);
+      out.push(a + (b - a) * phase);
+    }
+    return out;
+  }
+  return Number(fromVal) + (Number(toVal) - Number(fromVal)) * phase;
+}
+
 // Reformata a curva ENTRE a primeira e a última keyframe já existentes de cada
-// propriedade escolhida, usando a curva de Bézier desenhada no editor visual do painel.
-// propsJson: ex. ["Position","Scale"]   p1x/p1y/p2x/p2y: alças da curva (0..1, y pode passar disso para overshoot)
-function applyCurveToKeyframes(propsJson, p1x, p1y, p2x, p2y) {
+// propriedade escolhida.
+//
+// O PAINEL faz toda a amostragem da curva (que pode ser multi-âncora, com
+// overshoot e quiques) e manda pares {t, v} já prontos em espaço normalizado:
+// t = fase 0..1 no intervalo entre as duas keyframes extremas, v = fase do
+// valor (0 = valor da 1ª keyframe, 1 = valor da última, podendo passar disso).
+// Aqui o script só mapeia isso para tempo/valor reais e escreve. Manter o
+// ExtendScript "burro" evita reimplementar a matemática de Bézier em ES3.
+function applyCurveSamples(propsJson, samplesJson) {
   try {
     var seq = _requireSequence();
     var items = _getSelectedVideoItems(seq);
@@ -1027,10 +1075,12 @@ function applyCurveToKeyframes(propsJson, p1x, p1y, p2x, p2y) {
     var props = JSON.parse(propsJson);
     if (!props || props.length === 0) return "erro:Escolha ao menos uma propriedade.";
 
-    var bp1x = parseFloat(p1x), bp1y = parseFloat(p1y), bp2x = parseFloat(p2x), bp2y = parseFloat(p2y);
+    var samples = JSON.parse(samplesJson);
+    if (!samples || samples.length === 0) return "erro:Curva sem amostras.";
+
     var applied = 0;
-    var skippedNoKeys = 0;
-    var usedFallback = false;
+    var notAnimated = 0;
+    var eps = 1 / 240;
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -1046,45 +1096,41 @@ function applyCurveToKeyframes(propsJson, p1x, p1y, p2x, p2y) {
         } else if (motion) {
           param = _findParam(motion, propName) || _findParam(motion, _PROP_PT_NAME[propName]);
         }
-        if (!param || !param.isTimeVarying || !param.isTimeVarying()) continue;
+        if (!param || !_kfSupported(param)) continue;
+        if (!param.isTimeVarying || !param.isTimeVarying()) continue;
 
-        var firstTime, lastTime, fromVal, toVal;
         var times = _getParamKeyTimes(param);
+        if (!times || times.length < 2) continue;
+        times.sort(function (a, b) { return a - b; });
 
-        if (times && times.length >= 2) {
-          times.sort(function (a, b) { return a.seconds - b.seconds; });
-          firstTime = times[0];
-          lastTime = times[times.length - 1];
-          fromVal = param.getValueAtKey(firstTime);
-          toVal = param.getValueAtKey(lastTime);
-        } else {
-          // Não deu pra listar as keyframes exatas nesta versão do Premiere — usa o
-          // início/fim do clipe como aproximação (o parâmetro já está animado).
-          firstTime = _timeAt(item.start.seconds);
-          lastTime = _timeAt(item.end.seconds);
-          fromVal = param.getValueAtTime(firstTime);
-          toVal = param.getValueAtTime(lastTime);
-          usedFallback = true;
+        var t0 = times[0];
+        var t1 = times[times.length - 1];
+        var dur = t1 - t0;
+        if (dur <= 0) continue;
+
+        var fromVal = param.getValueAtKey(_timeAt(t0));
+        var toVal = param.getValueAtKey(_timeAt(t1));
+
+        // Limpa só o MIOLO do intervalo. As keyframes extremas do usuário
+        // sobrevivem — recriá-las com addKey zeraria o valor delas.
+        param.removeKeyRange(_timeAt(t0 + eps), _timeAt(t1 - eps), true);
+
+        for (var s = 0; s < samples.length; s++) {
+          var sm = samples[s];
+          var st = t0 + Number(sm.t) * dur;
+          if (st <= t0 + eps || st >= t1 - eps) continue;
+          _writeBakedKey(param, st, _lerpValue(fromVal, toVal, Number(sm.v)));
         }
 
-        var startSec = firstTime.seconds;
-        var durSec = lastTime.seconds - startSec;
-        if (durSec <= 0) continue;
-
-        _bakeBezierKeyframes(param, startSec, durSec, fromVal, toVal, bp1x, bp1y, bp2x, bp2y);
         any = true;
       }
 
       if (any) applied++;
-      else skippedNoKeys++;
+      else notAnimated++;
     }
 
-    if (applied > 0) {
-      var msg = "ok:" + applied + " clipe(s)";
-      if (usedFallback) msg += " (usei início/fim do clipe como aproximação — não consegui listar as keyframes exatas nesta versão do Premiere)";
-      return msg;
-    }
-    return "erro:Nenhuma propriedade escolhida está animada (com Time-Varying Stopwatch ativado) nos clipes selecionados.";
+    if (applied > 0) return "ok:" + applied + " clipe(s)";
+    return "erro:Nenhuma propriedade escolhida tem 2+ keyframes nos clipes selecionados. Ative o cronômetro da propriedade no Controle de Efeitos e crie ao menos 2 keyframes.";
   } catch (e) {
     return "erro:" + e.toString();
   }

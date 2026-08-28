@@ -558,43 +558,100 @@ button.primary:active { transform: scale(0.97); }
 
 .prop-check input { margin: 0; accent-color: var(--accent); }
 
-.curve-editor-svg {
+/* barra: alternador Valor/Velocidade + play de preview */
+
+.curve-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seg-toggle {
+  display: inline-flex;
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.seg-btn:hover { background: var(--card-hover); border-color: transparent; }
+
+.seg-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.icon-btn svg { width: 13px; height: 13px; }
+.icon-btn:hover { color: var(--accent-2); }
+
+/* canvas do editor de curvas (portado do Easify) */
+
+.curve-canvas {
   width: 100%;
-  height: auto;
-  aspect-ratio: 240 / 260;
+  height: 220px;
+  display: block;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   touch-action: none;
 }
 
-.curve-plot-bg { fill: rgba(255, 255, 255, 0.02); }
-.curve-axis { stroke: var(--border); stroke-width: 1.5; }
-.curve-axis-soft { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 3; opacity: .6; }
-.curve-path { fill: none; stroke: var(--accent); stroke-width: 2.5; }
-.curve-handle-line { stroke: var(--text-dim); stroke-width: 1; stroke-dasharray: 2 2; }
-.curve-anchor { fill: var(--text-dim); }
-
-.curve-handle {
-  fill: var(--accent);
-  stroke: #fff;
-  stroke-width: 1.5;
-  cursor: grab;
+.curve-canvas:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.curve-handle:active { cursor: grabbing; }
 
-.curve-preset-list {
+.curve-tips kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-size: 9px;
+}
+
+/* grade de presets */
+
+.curve-preset-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
+  max-height: 230px;
+  overflow-y: auto;
 }
 
 .curve-preset {
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 5px;
-  padding: 3px;
+  padding: 4px 3px 2px;
   cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .curve-preset:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
@@ -602,9 +659,49 @@ button.primary:active { transform: scale(0.97); }
 .curve-thumb-svg {
   width: 100%;
   height: auto;
-  aspect-ratio: 240 / 260;
+  aspect-ratio: 1 / 1;
   display: block;
   pointer-events: none;
 }
 
-.curve-thumb-path { stroke-width: 5; }
+.curve-thumb-path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.curve-preset-name {
+  display: block;
+  text-align: center;
+  font-size: 8.5px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.curve-preset:hover .curve-preset-name { color: var(--text); }
+
+.curve-preset-del {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.curve-preset:hover .curve-preset-del { opacity: 1; }
+.curve-preset-del:hover { color: var(--err); background: transparent; }

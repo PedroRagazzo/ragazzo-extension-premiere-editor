@@ -256,29 +256,129 @@
     run("applySmoothMotion()");
   });
 
-  var CURVE_PRESETS = [
-    { name: "Linear", points: [0, 0, 1, 1] },
-    { name: "Suave", points: [0.25, 0.1, 0.25, 1] },
-    { name: "Acelera", points: [0.42, 0, 1, 1] },
-    { name: "Desacelera", points: [0, 0, 0.58, 1] },
-    { name: "Nas pontas", points: [0.42, 0, 0.58, 1] },
-    { name: "Com exagero", points: [0.34, 1.3, 0.64, 1] }
-  ];
+  // ---------- Suavizar movimento: editor de curvas ----------
+  // Quantas keyframes intermediárias são escritas na timeline. Precisa ser
+  // denso o bastante para reproduzir quiques/elástico, sem entupir o Controle
+  // de Efeitos: com 28 pontos até o preset "Elástico" (6 oscilações) fica fiel.
+  var CURVE_BAKE_SAMPLES = 28;
 
-  var smoothCurve = CurveEditor.create(document.getElementById("smooth-curve-editor"), {
-    points: CURVE_PRESETS[1].points
+  var graph = new EZGraph(document.getElementById("curve-canvas"), {});
+  graph.setCurve(CurvePresets.toCurve(CurvePresets.builtins[9])); // "In-Out"
+
+  // O canvas nasce com tamanho zero enquanto o card está fechado; o EZGraph lê
+  // getBoundingClientRect() no construtor, então precisa remedir quando o card
+  // abre (e quando o painel muda de largura).
+  var curveCard = document.getElementById("curve-canvas").closest(".effect-card");
+  if (curveCard) {
+    var curveHeader = curveCard.querySelector(".effect-header");
+    if (curveHeader) {
+      curveHeader.addEventListener("click", function () {
+        setTimeout(function () { graph.resize(); }, 260); // após a transição do acordeão
+      });
+    }
+  }
+  window.addEventListener("resize", function () { graph.resize(); });
+
+  // modo Valor / Velocidade
+  var segButtons = document.querySelectorAll(".curve-toolbar .seg-btn");
+  Array.prototype.forEach.call(segButtons, function (btn) {
+    btn.addEventListener("click", function () {
+      Array.prototype.forEach.call(segButtons, function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      graph.setMode(btn.getAttribute("data-mode"));
+    });
   });
 
-  var curvePresetContainer = document.getElementById("smooth-curve-presets");
-  CURVE_PRESETS.forEach(function (preset) {
-    var btn = document.createElement("div");
-    btn.className = "curve-preset";
-    btn.title = preset.name;
-    btn.appendChild(CurveEditor.makeThumb(preset.points));
-    btn.addEventListener("click", function () {
-      smoothCurve.setPoints(preset.points);
+  // Delete/Backspace remove a âncora selecionada (só quando o canvas tem foco
+  // visual, para não sequestrar a tecla enquanto o usuário digita nos campos).
+  document.getElementById("curve-canvas").setAttribute("tabindex", "0");
+  document.getElementById("curve-canvas").addEventListener("keydown", function (e) {
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (graph.deleteActiveAnchor()) e.preventDefault();
+    }
+  });
+
+  // pré-visualização: roda a fase 0..1 uma vez
+  var previewTimer = null;
+  document.getElementById("curve-play").addEventListener("click", function () {
+    if (previewTimer) { clearInterval(previewTimer); previewTimer = null; }
+    var t0 = Date.now();
+    var durMs = 1400;
+    previewTimer = setInterval(function () {
+      var phase = (Date.now() - t0) / durMs;
+      if (phase >= 1) {
+        graph.setPreviewPhase(1);
+        clearInterval(previewTimer);
+        previewTimer = null;
+        return;
+      }
+      graph.setPreviewPhase(phase);
+    }, 16);
+  });
+
+  // ---- grade de presets ----
+  var presetGrid = document.getElementById("curve-preset-grid");
+
+  function makePresetCell(preset, onPick, onDelete) {
+    var cell = document.createElement("div");
+    cell.className = "curve-preset";
+    cell.title = preset.name;
+
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "-6 -6 112 112");
+    svg.setAttribute("class", "curve-thumb-svg");
+    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", CurvePresets.thumbPath(CurvePresets.toCurve(preset)));
+    path.setAttribute("class", "curve-thumb-path");
+    svg.appendChild(path);
+    cell.appendChild(svg);
+
+    var label = document.createElement("span");
+    label.className = "curve-preset-name";
+    label.textContent = preset.name;
+    cell.appendChild(label);
+
+    cell.addEventListener("click", function () { onPick(preset); });
+
+    if (onDelete) {
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "curve-preset-del";
+      del.textContent = "×";
+      del.title = "Excluir preset";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        onDelete();
+      });
+      cell.appendChild(del);
+    }
+    return cell;
+  }
+
+  function renderPresets() {
+    presetGrid.innerHTML = "";
+    CurvePresets.builtins.forEach(function (preset) {
+      presetGrid.appendChild(makePresetCell(preset, function (p) {
+        graph.setCurve(CurvePresets.toCurve(p));
+      }));
     });
-    curvePresetContainer.appendChild(btn);
+    CurvePresets.loadUser().forEach(function (preset, index) {
+      presetGrid.appendChild(makePresetCell(preset, function (p) {
+        graph.setCurve(CurvePresets.toCurve(p));
+      }, function () {
+        CurvePresets.removeUser(index);
+        renderPresets();
+      }));
+    });
+  }
+  renderPresets();
+
+  document.getElementById("curve-save-preset").addEventListener("click", function () {
+    var name = window.prompt("Nome do preset:", "Minha curva");
+    if (!name) return;
+    CurvePresets.addUser(name.trim(), graph.getCurve());
+    renderPresets();
+    setMessage('Preset "' + name.trim() + '" salvo.', "ok");
   });
 
   document.getElementById("apply-curve").addEventListener("click", function () {
@@ -293,11 +393,16 @@
       return;
     }
 
-    var pts = smoothCurve.getPoints();
+    // O painel amostra a curva; o ExtendScript só escreve os pares {t, v}.
+    var samples = EFCurves.sample(graph.getCurve(), CURVE_BAKE_SAMPLES);
+    var payload = samples.map(function (s) {
+      return { t: Number(s.time.toFixed(6)), v: Number(s.value.toFixed(6)) };
+    });
+
     run(
-      "applyCurveToKeyframes(" +
+      "applyCurveSamples(" +
         JSON.stringify(JSON.stringify(props)) + ", " +
-        pts[0] + ", " + pts[1] + ", " + pts[2] + ", " + pts[3] +
+        JSON.stringify(JSON.stringify(payload)) +
         ")"
     );
   });

@@ -474,7 +474,7 @@
       </button>
       <div class="effect-body">
         <div class="effect-body-inner">
-          <p class="hint">Redesenha a curva entre a primeira e a última keyframe já existentes na propriedade escolhida. Arraste as alças (pontos coloridos) para moldar a curva, ou clique num preset abaixo. Não remove tremor de câmera — para isso use o Warp Stabilizer nativo do Premiere.</p>
+          <p class="hint">Redesenha a curva entre a primeira e a última keyframe já existentes na propriedade escolhida. Não remove tremor de câmera — para isso use o Warp Stabilizer nativo do Premiere.</p>
 
           <div class="prop-checks">
             <label class="prop-check"><input type="checkbox" id="curve-prop-position" checked /> Posição</label>
@@ -483,8 +483,27 @@
             <label class="prop-check"><input type="checkbox" id="curve-prop-opacity" /> Opacidade</label>
           </div>
 
-          <div id="smooth-curve-editor"></div>
-          <div id="smooth-curve-presets" class="curve-preset-list"></div>
+          <div class="curve-toolbar">
+            <div class="seg-toggle" role="tablist">
+              <button type="button" class="seg-btn active" data-mode="value" role="tab">Valor</button>
+              <button type="button" class="seg-btn" data-mode="speed" role="tab">Velocidade</button>
+            </div>
+            <button type="button" id="curve-play" class="icon-btn" title="Pré-visualizar a curva">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="7 5 19 12 7 19"/></svg>
+            </button>
+          </div>
+
+          <canvas id="curve-canvas" class="curve-canvas" width="600" height="440"></canvas>
+
+          <p class="hint curve-tips">Arraste as alças para moldar. <strong>Duplo-clique na curva</strong> adiciona um ponto; duplo-clique num ponto remove. Segure <kbd>Shift</kbd> para desligar o encaixe.</p>
+
+          <div class="preset-bar">
+            <div class="row">
+              <label>Presets</label>
+              <button type="button" id="curve-save-preset">Salvar atual</button>
+            </div>
+            <div id="curve-preset-grid" class="curve-preset-grid"></div>
+          </div>
 
           <button class="primary" id="apply-curve">Aplicar curva</button>
           <p class="hint">Requer que a propriedade já tenha 2 ou mais keyframes no Controle de Efeitos do Premiere.</p>
@@ -530,7 +549,9 @@
   <script src="js/loudness.js"></script>
   <script src="js/silence-cut.js"></script>
   <script src="js/captions.js"></script>
-  <script src="js/curve-editor.js"></script>
+  <script src="js/curves.js"></script>
+  <script src="js/graph.js"></script>
+  <script src="js/curve-presets.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
 </body>
