@@ -23,6 +23,16 @@ function _timeAt(seconds) {
   return t;
 }
 
+// IMPORTANTE — convenção de POSIÇÃO no Premiere:
+// O parâmetro "Posição" do componente Movimento NÃO usa pixels: usa coordenadas
+// normalizadas em relação ao quadro da sequência, onde [0,0] é o canto superior
+// esquerdo, [1,1] é o canto inferior direito e [0.5,0.5] é o centro.
+// Passar pixels (ex.: 960) faz o Premiere interpretar como "960x a largura do quadro"
+// e o valor estoura no limite interno de 32767px. Toda a matemática de posição
+// deste arquivo trabalha em unidades normalizadas.
+var _POS_CENTER_X = 0.5;
+var _POS_CENTER_Y = 0.5;
+
 // Curvas de easing (equações clássicas de Robert Penner, domínio público).
 // easing: "linear" | "easeIn" | "easeOut" | "easeInOut" | "back"
 function _ease(easing, t) {
@@ -280,8 +290,6 @@ function applyAlignment(align) {
     var items = _getSelectedVideoItems(seq);
     if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var applied = 0;
 
     for (var i = 0; i < items.length; i++) {
@@ -295,13 +303,29 @@ function applyAlignment(align) {
       var x = current[0];
       var y = current[1];
 
-      if (align === "left") x = 0;
-      else if (align === "center") x = frameW / 2;
-      else if (align === "right") x = frameW;
-      else if (align === "top") y = 0;
-      else if (align === "middle") y = frameH / 2;
-      else if (align === "bottom") y = frameH;
+      // Alinha a BORDA do clipe com a borda do quadro (não o centro dele), assumindo
+      // que o clipe preenche o quadro em Escala 100%. Em unidades normalizadas, um
+      // clipe na escala s% ocupa s/100 do quadro, logo sua meia-largura é (s/100)/2.
+      var scaleParam = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+      var halfSize = 0.5;
+      if (scaleParam) {
+        var sv = scaleParam.isTimeVarying()
+          ? scaleParam.getValueAtTime(_timeAt(item.start.seconds))
+          : scaleParam.getValue();
+        var svNum = parseFloat(sv);
+        if (!isNaN(svNum) && svNum > 0) halfSize = (svNum / 100) / 2;
+      }
+      // Um clipe maior que o quadro não tem "folga" para alinhar: mantém no centro.
+      if (halfSize > 0.5) halfSize = 0.5;
 
+      if (align === "left") x = halfSize;
+      else if (align === "center") x = _POS_CENTER_X;
+      else if (align === "right") x = 1 - halfSize;
+      else if (align === "top") y = halfSize;
+      else if (align === "middle") y = _POS_CENTER_Y;
+      else if (align === "bottom") y = 1 - halfSize;
+
+      if (position.isTimeVarying()) position.setTimeVarying(false);
       position.setValue([x, y], true);
       applied++;
     }
@@ -394,8 +418,6 @@ function resetMotion() {
     var items = _getSelectedVideoItems(seq);
     if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var applied = 0;
 
     for (var i = 0; i < items.length; i++) {
@@ -411,7 +433,7 @@ function resetMotion() {
 
       if (position) {
         if (position.isTimeVarying()) position.setTimeVarying(false);
-        position.setValue([frameW / 2, frameH / 2], true);
+        position.setValue([_POS_CENTER_X, _POS_CENTER_Y], true);
       }
       if (scale) {
         if (scale.isTimeVarying()) scale.setTimeVarying(false);
@@ -447,19 +469,18 @@ function applyCrop(amountPercent, anchorX, anchorY) {
     var amount = parseFloat(amountPercent);
     if (!amount || amount <= 0) return "erro:Intensidade de corte inválida.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
+    // Em unidades normalizadas, ampliar para a escala s deixa (s-1) de "sobra" em
+    // cada eixo; deslocar meia sobra encosta o lado escolhido na borda do quadro.
     var s = 1 + amount / 100;
-    var extraW = (s - 1) * frameW;
-    var extraH = (s - 1) * frameH;
+    var extra = s - 1;
 
-    var x = frameW / 2;
-    if (anchorX === "left") x = frameW / 2 - extraW / 2;
-    else if (anchorX === "right") x = frameW / 2 + extraW / 2;
+    var x = _POS_CENTER_X;
+    if (anchorX === "left") x = _POS_CENTER_X - extra / 2;
+    else if (anchorX === "right") x = _POS_CENTER_X + extra / 2;
 
-    var y = frameH / 2;
-    if (anchorY === "top") y = frameH / 2 - extraH / 2;
-    else if (anchorY === "bottom") y = frameH / 2 + extraH / 2;
+    var y = _POS_CENTER_Y;
+    if (anchorY === "top") y = _POS_CENTER_Y - extra / 2;
+    else if (anchorY === "bottom") y = _POS_CENTER_Y + extra / 2;
 
     var applied = 0;
     for (var i = 0; i < items.length; i++) {
@@ -498,26 +519,24 @@ function applySplitScreen(layout) {
     }
     items = items.slice(0, need);
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var cells;
 
     if (layout === "2h") {
       cells = [
-        { x: frameW * 0.25, y: frameH * 0.5 },
-        { x: frameW * 0.75, y: frameH * 0.5 }
+        { x: 0.25, y: 0.5 },
+        { x: 0.75, y: 0.5 }
       ];
     } else if (layout === "2v") {
       cells = [
-        { x: frameW * 0.5, y: frameH * 0.25 },
-        { x: frameW * 0.5, y: frameH * 0.75 }
+        { x: 0.5, y: 0.25 },
+        { x: 0.5, y: 0.75 }
       ];
     } else {
       cells = [
-        { x: frameW * 0.25, y: frameH * 0.25 },
-        { x: frameW * 0.75, y: frameH * 0.25 },
-        { x: frameW * 0.25, y: frameH * 0.75 },
-        { x: frameW * 0.75, y: frameH * 0.75 }
+        { x: 0.25, y: 0.25 },
+        { x: 0.75, y: 0.25 },
+        { x: 0.25, y: 0.75 },
+        { x: 0.75, y: 0.75 }
       ];
     }
 
@@ -552,8 +571,6 @@ function applyDistribute(orientation) {
     var items = _getSelectedVideoItemsOrderedByTrack(seq);
     if (items.length < 2) return "erro:Selecione 2 ou mais clipes de vídeo (em trilhas diferentes) para distribuir.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var n = items.length;
     var scaleValue = 100 / n;
     var applied = 0;
@@ -568,11 +585,11 @@ function applyDistribute(orientation) {
 
       var x, y;
       if (orientation === "column") {
-        x = frameW / 2;
-        y = (i + 0.5) * (frameH / n);
+        x = _POS_CENTER_X;
+        y = (i + 0.5) / n;
       } else {
-        x = (i + 0.5) * (frameW / n);
-        y = frameH / 2;
+        x = (i + 0.5) / n;
+        y = _POS_CENTER_Y;
       }
 
       if (scale.isTimeVarying()) scale.setTimeVarying(false);
@@ -598,9 +615,8 @@ function applyCascade(scaleStepPercent, offsetStepPercent, corner) {
     var items = _getSelectedVideoItemsOrderedByTrack(seq);
     if (items.length < 2) return "erro:Selecione 2 ou mais clipes de vídeo (em trilhas diferentes) para a cascata.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var scaleStep = parseFloat(scaleStepPercent);
+    // offsetStep já é uma fração do quadro (0..1), que é exatamente a unidade de Posição.
     var offsetStep = parseFloat(offsetStepPercent) / 100;
 
     var signX = (corner === "top-right" || corner === "bottom-right") ? -1 : 1;
@@ -626,8 +642,8 @@ function applyCascade(scaleStepPercent, offsetStepPercent, corner) {
       if (!scale || !position) continue;
 
       var newScale = Math.max(15, baseScale - i * scaleStep);
-      var dx = i * offsetStep * frameW * signX;
-      var dy = i * offsetStep * frameH * signY;
+      var dx = i * offsetStep * signX;
+      var dy = i * offsetStep * signY;
 
       if (scale.isTimeVarying()) scale.setTimeVarying(false);
       scale.setValue(newScale, true);
@@ -806,8 +822,6 @@ function applyAnimateClip(preset, durationSeconds, easing) {
     var items = _getSelectedVideoItems(seq);
     if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
 
-    var frameW = parseInt(seq.frameSizeHorizontal, 10);
-    var frameH = parseInt(seq.frameSizeVertical, 10);
     var applied = 0;
     easing = easing || "easeOut";
 
@@ -827,11 +841,13 @@ function applyAnimateClip(preset, durationSeconds, easing) {
         var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
         if (position) {
           var finalPos = position.getValue();
+          // 1.0 = uma largura/altura inteira do quadro, o suficiente para o clipe
+          // começar completamente fora da tela.
           var offX = 0, offY = 0;
-          if (preset === "slide-left") offX = -frameW;
-          if (preset === "slide-right") offX = frameW;
-          if (preset === "slide-top") offY = -frameH;
-          if (preset === "slide-bottom") offY = frameH;
+          if (preset === "slide-left") offX = -1;
+          if (preset === "slide-right") offX = 1;
+          if (preset === "slide-top") offY = -1;
+          if (preset === "slide-bottom") offY = 1;
 
           _bakeEasedKeyframes(position, clipStart, dur, [finalPos[0] + offX, finalPos[1] + offY], finalPos, easing);
           ok = true;
