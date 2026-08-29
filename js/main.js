@@ -123,13 +123,16 @@
     run("applySpeed(" + JSON.stringify(speed) + ")");
   });
 
-  var alignButtons = document.querySelectorAll("[data-align]");
-  for (var i = 0; i < alignButtons.length; i++) {
-    alignButtons[i].addEventListener("click", function (e) {
-      var align = e.currentTarget.getAttribute("data-align");
-      run("applyAlignment('" + align + "')");
+  var anchorButtons = document.querySelectorAll("#anchor-grid .anchor-cell");
+  Array.prototype.forEach.call(anchorButtons, function (btn) {
+    btn.addEventListener("click", function () {
+      Array.prototype.forEach.call(anchorButtons, function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      var x = btn.getAttribute("data-x");
+      var y = btn.getAttribute("data-y");
+      run("applyAnchorAlignment('" + x + "', '" + y + "')");
     });
-  }
+  });
 
   var clipboardMotion = null;
 

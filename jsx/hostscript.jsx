@@ -235,8 +235,7 @@ function applySpeed(speedPercent) {
       var item = items[i];
       var qeItem = _findQeItem(seq, item);
       if (qeItem && typeof qeItem.setSpeed === "function") {
-        qeItem.setSpeed(speed, false, false, true);
-        applied++;
+        if (_qeSetSpeed(qeItem, speed)) applied++;
       }
     }
 
@@ -244,6 +243,31 @@ function applySpeed(speedPercent) {
   } catch (e) {
     return "erro:" + e.toString();
   }
+}
+
+// A contagem de parâmetros de QEClip.setSpeed() não é documentada e varia entre
+// versões do Premiere — usar a aridade errada faz o próprio engine ExtendScript
+// lançar "Not Enough Parameters" antes de qualquer código nosso rodar. Tenta
+// várias assinaturas conhecidas, da mais completa para a mais simples; como o
+// engine valida a contagem ANTES de executar o corpo da função nativa, uma
+// tentativa com aridade errada não chega a ter efeito colateral.
+function _qeSetSpeed(qeItem, speed) {
+  var attempts = [
+    function () { qeItem.setSpeed(speed, false, false, true, false); },
+    function () { qeItem.setSpeed(speed, false, false, true); },
+    function () { qeItem.setSpeed(speed, false, false); },
+    function () { qeItem.setSpeed(speed, false); },
+    function () { qeItem.setSpeed(speed); }
+  ];
+  for (var i = 0; i < attempts.length; i++) {
+    try {
+      attempts[i]();
+      return true;
+    } catch (e) {
+      // tenta a próxima assinatura
+    }
+  }
+  return false;
 }
 
 // A QE DOM (legada/não documentada) expressa tempo em "ticks" (254016000000 por
@@ -330,9 +354,34 @@ function _findTrackIndexOf(seq, item) {
   return 1;
 }
 
-// ---------- ALINHAMENTO ----------
-// align: "left" | "center" | "right" | "top" | "middle" | "bottom"
-function applyAlignment(align) {
+// ---------- ALINHAMENTO (grid de âncora 3x3) ----------
+// Calcula a meia-largura/meia-altura do clipe em unidades normalizadas, a partir
+// da Escala atual (assumindo que o clipe preenche o quadro em Escala 100%). Um
+// clipe maior que o quadro não tem "folga" para alinhar: o resultado é limitado
+// a 0.5 (fica no centro).
+function _halfExtentForMotion(motion, item) {
+  var half = 0.5;
+  var scaleParam = _findParam(motion, "Scale") || _findParam(motion, "Escala");
+  if (scaleParam) {
+    var sv = null;
+    try {
+      sv = (typeof scaleParam.isTimeVarying === "function" && scaleParam.isTimeVarying())
+        ? scaleParam.getValueAtTime(_timeAt(item.start.seconds))
+        : scaleParam.getValue();
+    } catch (e) {
+      sv = null;
+    }
+    var svNum = parseFloat(sv);
+    if (!isNaN(svNum) && svNum > 0) half = (svNum / 100) / 2;
+  }
+  return half > 0.5 ? 0.5 : half;
+}
+
+// anchorX: "left" | "center" | "right"   anchorY: "top" | "middle" | "bottom"
+// Os 9 pontos clássicos de ancoragem (cantos, bordas, centro) do grid 3x3 do painel.
+// Cada clique define os DOIS eixos de uma vez — diferente do antigo esquema de 6
+// botões de eixo único.
+function applyAnchorAlignment(anchorX, anchorY) {
   try {
     var seq = _requireSequence();
     var items = _getSelectedVideoItems(seq);
@@ -347,31 +396,9 @@ function applyAlignment(align) {
       var position = _findParam(motion, "Position") || _findParam(motion, "Posição");
       if (!position) continue;
 
-      var current = position.getValue();
-      var x = current[0];
-      var y = current[1];
-
-      // Alinha a BORDA do clipe com a borda do quadro (não o centro dele), assumindo
-      // que o clipe preenche o quadro em Escala 100%. Em unidades normalizadas, um
-      // clipe na escala s% ocupa s/100 do quadro, logo sua meia-largura é (s/100)/2.
-      var scaleParam = _findParam(motion, "Scale") || _findParam(motion, "Escala");
-      var halfSize = 0.5;
-      if (scaleParam) {
-        var sv = scaleParam.isTimeVarying()
-          ? scaleParam.getValueAtTime(_timeAt(item.start.seconds))
-          : scaleParam.getValue();
-        var svNum = parseFloat(sv);
-        if (!isNaN(svNum) && svNum > 0) halfSize = (svNum / 100) / 2;
-      }
-      // Um clipe maior que o quadro não tem "folga" para alinhar: mantém no centro.
-      if (halfSize > 0.5) halfSize = 0.5;
-
-      if (align === "left") x = halfSize;
-      else if (align === "center") x = _POS_CENTER_X;
-      else if (align === "right") x = 1 - halfSize;
-      else if (align === "top") y = halfSize;
-      else if (align === "middle") y = _POS_CENTER_Y;
-      else if (align === "bottom") y = 1 - halfSize;
+      var half = _halfExtentForMotion(motion, item);
+      var x = anchorX === "left" ? half : (anchorX === "right" ? 1 - half : _POS_CENTER_X);
+      var y = anchorY === "top" ? half : (anchorY === "bottom" ? 1 - half : _POS_CENTER_Y);
 
       if (position.isTimeVarying()) position.setTimeVarying(false);
       position.setValue([x, y], true);

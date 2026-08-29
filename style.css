@@ -319,6 +319,65 @@ main {
   }
 }
 
+/* ---------- grade de âncora 3x3 (Alinhamento) ---------- */
+
+.anchor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 168px;
+  margin: 2px auto 0;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.anchor-cell {
+  all: unset;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.anchor-cell:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.anchor-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.anchor-cell.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.anchor-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.anchor-cell:hover .anchor-dot,
+.anchor-cell.active .anchor-dot {
+  background: var(--accent-2);
+  transform: scale(1.4);
+}
+
 /* ---------- grade de predefinições de animação ---------- */
 
 .anim-preset-grid {

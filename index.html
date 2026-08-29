@@ -103,14 +103,17 @@
       </button>
       <div class="effect-body">
         <div class="effect-body-inner">
-          <p class="hint">Encosta a borda do clipe na borda do quadro. Um clipe em Escala 100% já preenche o quadro inteiro e por isso não se move — reduza a escala antes para ver o alinhamento.</p>
-          <div class="btn-group">
-            <button data-align="left">Esquerda</button>
-            <button data-align="center">Centro H</button>
-            <button data-align="right">Direita</button>
-            <button data-align="top">Topo</button>
-            <button data-align="middle">Centro V</button>
-            <button data-align="bottom">Base</button>
+          <p class="hint">Clique num ponto do grid para encostar a borda do clipe ali — os 9 pontos clássicos de ancoragem. Um clipe em Escala 100% já preenche o quadro inteiro e por isso não se move — reduza a escala antes para ver o efeito.</p>
+          <div id="anchor-grid" class="anchor-grid" role="group" aria-label="Ancoragem 3x3">
+            <button type="button" class="anchor-cell" data-x="left" data-y="top" title="Superior esquerda"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="center" data-y="top" title="Superior centro"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="right" data-y="top" title="Superior direita"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="left" data-y="middle" title="Meio esquerda"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="center" data-y="middle" title="Centro"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="right" data-y="middle" title="Meio direita"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="left" data-y="bottom" title="Inferior esquerda"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="center" data-y="bottom" title="Inferior centro"><span class="anchor-dot"></span></button>
+            <button type="button" class="anchor-cell" data-x="right" data-y="bottom" title="Inferior direita"><span class="anchor-dot"></span></button>
           </div>
 
           <p class="hint section-sep">Copie Posição/Escala/Rotação/Opacidade de um clipe e aplique em outros.</p>
