@@ -337,6 +337,21 @@
     run("applyLutToClip(" + JSON.stringify(lutSelectedPath) + ")");
   });
 
+  document.getElementById("lut-copy-path").addEventListener("click", function () {
+    if (!lutSelectedPath) {
+      setMessage('Selecione um LUT primeiro (a célula "Original" não tem arquivo).', "err");
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lutSelectedPath).then(
+        function () { setMessage("Caminho copiado: " + lutSelectedPath, "ok"); },
+        function () { setMessage("Não consegui copiar. Caminho: " + lutSelectedPath, "err"); }
+      );
+    } else {
+      setMessage("Cópia automática indisponível. Caminho: " + lutSelectedPath, "err");
+    }
+  });
+
   document.getElementById("apply-smooth").addEventListener("click", function () {
     run("applySmoothMotion()");
   });

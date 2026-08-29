@@ -485,9 +485,10 @@
           <div class="btn-group">
             <button type="button" id="lut-reveal">Abrir pasta presets</button>
             <button type="button" id="lut-refresh">Recarregar</button>
+            <button type="button" id="lut-copy-path">Copiar caminho</button>
           </div>
           <button class="primary" id="apply-lut">Aplicar LUT selecionado</button>
-          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe. Se a sua versão do Premiere não permitir aplicar o LUT automaticamente, a mensagem mostra o caminho do arquivo pra você selecionar manualmente em Lumetri Color → Correção Básica → LUT de Entrada.</p>
+          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe. Em muitas versões do Premiere, "LUT de Entrada" é controlado por um índice interno (não por um caminho de arquivo), e a API de script não permite escolher um LUT novo nele — nesse caso o botão só serve pra escolher/pré-visualizar; a mensagem mostra o caminho do arquivo pra você selecionar manualmente em Lumetri Color → Correção Básica → LUT de Entrada.</p>
         </div>
       </div>
     </div>

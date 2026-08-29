@@ -1267,6 +1267,7 @@ function applyLutToClip(lutPath) {
     var missingLumetri = 0;
     var missingParam = 0;
     var setThrew = 0;
+    var setThrewNumericEnum = 0;
     var discoveredNames = null; // preenchido na 1ª vez que não achamos o parâmetro — pra diagnóstico
     var setDiag = null; // preenchido na 1ª vez que achamos o parâmetro mas setValue falhou
 
@@ -1300,6 +1301,7 @@ function applyLutToClip(lutPath) {
         applied++;
       } else {
         setThrew++;
+        if (typeof currentValue === "number") setThrewNumericEnum++;
         if (!setDiag) {
           setDiag = "parâmetro: \"" + matchedName + "\" | valor atual antes de tentar: " +
             _safeDescribe(currentValue) + " | erro da última tentativa: " +
@@ -1317,6 +1319,14 @@ function applyLutToClip(lutPath) {
       ? "Abra o Lumetri Color no clipe, vá em Correção Básica > LUT de Entrada e selecione manualmente: " + lutPath
       : "Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
 
+    // Conclusão, não mais só "tentativa": se o valor atual do parâmetro é NUMÉRICO,
+    // "LUT de Entrada" nesta versão do Premiere é um índice pra uma lista interna
+    // de LUTs já conhecidos (não um caminho de arquivo) — não há como calcular por
+    // script o índice de um arquivo novo que o Premiere ainda não carregou, então
+    // nem vale insistir tentando outros formatos.
+    if (setThrewNumericEnum > 0) {
+      return "erro:Nesta versão do Premiere, 'LUT de Entrada' é controlado por um número interno (índice de uma lista de LUTs já conhecidos pelo Premiere), não por um caminho de arquivo — não dá pra aplicar um LUT novo por script aqui. " + manualStep;
+    }
     if (setThrew > 0) {
       return "erro:Encontrei o parâmetro de LUT, mas nenhuma das formas que tentei de passar o valor funcionou. Diagnóstico: " +
         setDiag + ". " + manualStep;
