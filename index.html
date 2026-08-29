@@ -314,7 +314,7 @@
             <input type="number" id="target-lufs" value="-16" min="-40" max="0" />
           </div>
           <button class="primary" id="apply-level">Nivelar clipes selecionados</button>
-          <p class="hint">Mede o loudness de cada clipe de áudio selecionado (via ffmpeg, do arquivo de mídia inteiro) e ajusta o ganho para o alvo.</p>
+          <p class="hint">Mede o loudness de cada clipe de áudio selecionado (via ffmpeg, do arquivo de mídia inteiro) e ajusta o ganho para o alvo. O parâmetro "Nível" do Premiere trava em +15dB — se o clipe precisar de mais ganho do que isso pra alcançar o alvo, o painel aplica o máximo possível e avisa.</p>
         </div>
       </div>
     </div>

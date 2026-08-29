@@ -215,7 +215,25 @@
         },
         function (gains) {
           setLoading("Aplicando ganho...");
-          CepBridge.evalScript("applyGainsToSelection(" + JSON.stringify(JSON.stringify(gains)) + ")", setStatus);
+          var clampedCount = 0;
+          gains.forEach(function (g) { if (g.clamped) clampedCount++; });
+
+          CepBridge.evalScript("applyGainsToSelection(" + JSON.stringify(JSON.stringify(gains)) + ")", function (result) {
+            if (typeof result === "string" && result.indexOf("ok:") === 0 && clampedCount > 0) {
+              // O parâmetro Nível do Premiere trava em +15dB (ver LEVEL_MAX_DB em
+              // loudness.js) — quando o alvo pedido precisaria de mais ganho que
+              // isso, o resultado fica preso em 15dB mesmo que o alvo seja outro
+              // valor. Avisa em vez de deixar parecer que o alvo foi alcançado.
+              setMessage(
+                "Aplicado a " + result.slice(3) + ". Atenção: " + clampedCount +
+                  " clipe(s) precisariam de mais ganho do que o parâmetro \"Nível\" do Premiere permite (máx. +15dB) pra alcançar " +
+                  target + " LUFS — apliquei o máximo possível, mas o alvo não foi totalmente atingido nesses clipes.",
+                "ok"
+              );
+            } else {
+              setStatus(result);
+            }
+          });
         }
       );
     });

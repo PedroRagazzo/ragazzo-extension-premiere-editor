@@ -49,8 +49,21 @@
     tryNext();
   }
 
+  // O parâmetro "Nível" do efeito Volume (fixo, nativo do Premiere) tem um
+  // teto rígido de +15dB — é uma limitação da própria ferramenta (não do
+  // nosso código): setValue() acima disso é silenciosamente recortado pelo
+  // Premiere pra 15. Sem essa constante, um clipe muito baixo (que matematicamente
+  // precisaria de +20, +30dB pra alcançar o alvo) sempre terminava em "15dB
+  // cravado", não importa o alvo pedido — o que parecia bug mas era o nosso
+  // próprio clamp (±24, alto demais) deixando o Premiere fazer o corte real.
+  // Pro lado negativo o Premiere aceita valores bem baixos (na prática, perto
+  // de silêncio) — o piso aqui é só uma proteção contra leitura absurda do
+  // ffmpeg, não uma limitação real do parâmetro.
+  var LEVEL_MAX_DB = 15;
+  var LEVEL_MIN_DB = -96;
+
   // items: [{index, path}]  targetLufs: number
-  // callback(gainsArray) onde gainsArray = [{index, gainDb}]
+  // callback(gainsArray) onde gainsArray = [{index, gainDb, rawGainDb, clamped}]
   function measureAndComputeGains(items, targetLufs, onProgress, callback) {
     var results = [];
     var i = 0;
@@ -73,8 +86,13 @@
           results.push({ index: item.index, gainDb: null });
         } else {
           var gain = targetLufs - lufs;
-          gain = Math.max(-24, Math.min(24, gain));
-          results.push({ index: item.index, gainDb: gain });
+          var clampedGain = Math.max(LEVEL_MIN_DB, Math.min(LEVEL_MAX_DB, gain));
+          results.push({
+            index: item.index,
+            gainDb: clampedGain,
+            rawGainDb: gain,
+            clamped: clampedGain !== gain
+          });
         }
         i++;
         next();
