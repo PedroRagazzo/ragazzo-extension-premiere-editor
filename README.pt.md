@@ -8,6 +8,7 @@ Painel CEP (Common Extensibility Platform) para o Adobe Premiere Pro com atalhos
   <img src="https://img.shields.io/badge/Premiere%20Pro-15.0+-9999FF?logo=adobepremierepro&logoColor=white" alt="Premiere Pro 15.0+">
   <img src="https://img.shields.io/badge/CEP-10.0-333333" alt="CEP 10.0">
   <img src="https://img.shields.io/badge/build-nenhum%20(vanilla%20JS)-lightgrey" alt="Sem build step">
+  <img src="https://img.shields.io/badge/licença-MIT-green" alt="Licença MIT">
 </p>
 
 ## Funcionalidades
@@ -66,6 +67,10 @@ com.RagazzoEditor.efeitos/
 
 Sem build step, bundler ou dependências de terceiros — é HTML/CSS/JS puro carregado diretamente pelo Premiere.
 
+## Contribuindo
+
+Este é um projeto open source — issues, forks e pull requests são bem-vindos. Sinta-se à vontade para usar, modificar e redistribuir sob os termos da licença abaixo.
+
 ## Licença
 
-Projeto pessoal/privado — sem licença de uso público definida.
+[MIT](LICENSE) © Pedro Ragazzo

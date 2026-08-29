@@ -8,6 +8,7 @@ A CEP (Common Extensibility Platform) panel for Adobe Premiere Pro with one-clic
   <img src="https://img.shields.io/badge/Premiere%20Pro-15.0+-9999FF?logo=adobepremierepro&logoColor=white" alt="Premiere Pro 15.0+">
   <img src="https://img.shields.io/badge/CEP-10.0-333333" alt="CEP 10.0">
   <img src="https://img.shields.io/badge/build-none%20(vanilla%20JS)-lightgrey" alt="No build step">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
 </p>
 
 ## Features
@@ -66,6 +67,10 @@ com.RagazzoEditor.efeitos/
 
 No build step, bundler, or third-party dependencies — plain HTML/CSS/JS loaded directly by Premiere.
 
+## Contributing
+
+This is an open-source project — issues, forks, and pull requests are welcome. Feel free to use, modify, and redistribute it under the terms of the license below.
+
 ## License
 
-Personal/private project — no public-use license defined.
+[MIT](LICENSE) © Pedro Ragazzo

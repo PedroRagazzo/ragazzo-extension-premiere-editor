@@ -14,8 +14,11 @@
     window.SilenceCut = mod;
   }
 })(this, function () {
-  var FFMPEG_CANDIDATES = ["ffmpeg", "C:\\Users\\Ragazzo\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe"];
-  var FFPROBE_CANDIDATES = ["ffprobe", "C:\\Users\\Ragazzo\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffprobe.exe"];
+  // Tenta o PATH do sistema primeiro. Se o ffmpeg/ffprobe da sua máquina não
+  // estiver no PATH, adicione o caminho absoluto do executável como um item
+  // extra nestas listas.
+  var FFMPEG_CANDIDATES = ["ffmpeg"];
+  var FFPROBE_CANDIDATES = ["ffprobe"];
   var MAX_SEGMENTS = 400;
 
   // Faixa de frequência da voz humana falada. Aplicado só na PASSAGEM DE DETECÇÃO
