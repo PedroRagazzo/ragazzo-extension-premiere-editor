@@ -1,6 +1,6 @@
 # Ragazzo Editor · Efeitos
 
-*[Leia em português](README.md)*
+*[Leia em português](README.pt.md)*
 
 A CEP (Common Extensibility Platform) panel for Adobe Premiere Pro with one-click shortcuts for repetitive editing effects and adjustments — zoom, alignment, cropping, split screens, clip animations, and a motion-easing curve editor, applied directly to the selected clip on the timeline.
 
