@@ -118,11 +118,6 @@
 
   renderZoomPresets();
 
-  document.getElementById("apply-speed").addEventListener("click", function () {
-    var speed = document.getElementById("speed-value").value;
-    run("applySpeed(" + JSON.stringify(speed) + ")");
-  });
-
   var anchorButtons = document.querySelectorAll("#anchor-grid .anchor-cell");
   Array.prototype.forEach.call(anchorButtons, function (btn) {
     btn.addEventListener("click", function () {

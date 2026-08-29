@@ -25,7 +25,7 @@
     </span>
     <div class="brand-text">
       <h1>Ragazzo Editor · Efeitos</h1>
-      <p>Zoom, velocidade, cor e mais para o clipe selecionado</p>
+      <p>Zoom, cor e mais para o clipe selecionado</p>
     </div>
     <div class="theme-switch" role="group" aria-label="Tema do painel">
       <button type="button" class="theme-swatch" data-theme-choice="escuro" title="Tema escuro" aria-pressed="true">
@@ -85,30 +85,6 @@
             </div>
             <button id="zoom-preset-save">+ Salvar preset atual</button>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="effect-card">
-      <button type="button" class="effect-header">
-        <span class="effect-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <polyline class="icon-ff" style="animation-delay:0s" points="4 6 10 12 4 18"/>
-            <polyline class="icon-ff" style="animation-delay:.2s" points="12 6 18 12 12 18"/>
-          </svg>
-        </span>
-        <span class="effect-title">Velocidade</span>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="effect-body">
-        <div class="effect-body-inner">
-          <p class="hint">Muda a velocidade de reprodução do clipe (100% = original).</p>
-          <div class="row slider-row">
-            <label for="speed-value">Velocidade</label>
-            <input type="range" id="speed-value-range" class="slider slider-speed" min="10" max="400" step="5" value="100" />
-            <input type="number" id="speed-value" class="slider-number" value="100" min="1" max="10000" />
-          </div>
-          <button class="primary" id="apply-speed">Aplicar velocidade</button>
         </div>
       </div>
     </div>

@@ -248,8 +248,6 @@ main {
 .icon-zoom-group { transform-origin: 10.5px 10.5px; animation: kf-pulse 2s ease-in-out infinite; }
 .icon-fade { animation: kf-blink-soft 2s ease-in-out infinite; }
 
-.icon-ff { animation: kf-ff 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-
 .icon-align-dot { animation: kf-align 2.6s ease-in-out infinite; }
 @keyframes kf-align {
   0%, 100% { cx: 6; }
@@ -338,13 +336,8 @@ main {
   50% { transform: scale(1.16); }
 }
 
-@keyframes kf-ff {
-  0%, 100% { opacity: .35; transform: translateX(0); }
-  50% { opacity: 1; transform: translateX(2px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .icon-zoom-group, .icon-fade, .icon-ff, .icon-align-dot, .icon-crop-a, .icon-crop-b,
+  .icon-zoom-group, .icon-fade, .icon-align-dot, .icon-crop-a, .icon-crop-b,
   .icon-split-fill, .icon-bar, .icon-duck-a, .icon-duck-b, .icon-slide-box, .icon-hue,
   .icon-wave-jagged, .icon-wave-smooth, .icon-cascade, .icon-cutgap {
     animation: none !important;
@@ -593,64 +586,6 @@ select:focus, input:focus {
   flex-shrink: 0;
 }
 
-/* barra de Velocidade: trilha laranja pulsante + par de setas saltitantes no
-   lugar da bolinha padrão, para remeter a "avançar rápido". */
-
-.slider-speed {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 22px;
-  background: transparent;
-}
-
-.slider-speed::-webkit-slider-runnable-track {
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  animation: kf-speed-pulse 1.6s ease-in-out infinite;
-}
-
-.slider-speed::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 30px;
-  height: 22px;
-  margin-top: -6px;
-  border-radius: 7px;
-  background-color: var(--panel);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffa74d' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 6 10 12 4 18'/%3E%3Cpolyline points='12 6 18 12 12 18'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 16px 16px;
-  border: 1.5px solid var(--accent-2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
-  cursor: grab;
-  animation: kf-speed-hop 0.9s ease-in-out infinite;
-}
-
-.slider-speed::-webkit-slider-thumb:active { cursor: grabbing; }
-
-/* o ícone ">>" do thumb é um SVG embutido — não lê CSS var(), então o tema
-   papel precisa da própria cópia (traço na cor do accent-2 daquele tema). */
-[data-theme="papel"] .slider-speed::-webkit-slider-thumb {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a3fa0' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 6 10 12 4 18'/%3E%3Cpolyline points='12 6 18 12 12 18'/%3E%3C/svg%3E");
-}
-
-@keyframes kf-speed-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-  50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
-}
-
-@keyframes kf-speed-hop {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(3px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .slider-speed::-webkit-slider-runnable-track, .slider-speed::-webkit-slider-thumb {
-    animation: none !important;
-  }
-}
 
 .section-sep {
   margin-top: 2px;

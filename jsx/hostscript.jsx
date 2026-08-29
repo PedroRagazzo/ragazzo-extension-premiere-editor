@@ -217,59 +217,6 @@ function applyZoom(direction, amountPercent, easing) {
   }
 }
 
-// ---------- VELOCIDADE ----------
-// speedPercent: nova velocidade em % (ex.: 200 = 2x mais rápido, 50 = câmera lenta)
-function applySpeed(speedPercent) {
-  try {
-    var seq = _requireSequence();
-    var items = _getSelectedVideoItems(seq);
-    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
-
-    var speed = parseFloat(speedPercent);
-    if (!speed || speed <= 0) return "erro:Velocidade inválida.";
-
-    if (typeof app.enableQE === "function") app.enableQE();
-    var applied = 0;
-
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var qeItem = _findQeItem(seq, item);
-      if (qeItem && typeof qeItem.setSpeed === "function") {
-        if (_qeSetSpeed(qeItem, speed)) applied++;
-      }
-    }
-
-    return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível alterar a velocidade (verifique se o QE DOM está disponível nesta versão do Premiere).";
-  } catch (e) {
-    return "erro:" + e.toString();
-  }
-}
-
-// A contagem de parâmetros de QEClip.setSpeed() não é documentada e varia entre
-// versões do Premiere — usar a aridade errada faz o próprio engine ExtendScript
-// lançar "Not Enough Parameters" antes de qualquer código nosso rodar. Tenta
-// várias assinaturas conhecidas, da mais completa para a mais simples; como o
-// engine valida a contagem ANTES de executar o corpo da função nativa, uma
-// tentativa com aridade errada não chega a ter efeito colateral.
-function _qeSetSpeed(qeItem, speed) {
-  var attempts = [
-    function () { qeItem.setSpeed(speed, false, false, true, false); },
-    function () { qeItem.setSpeed(speed, false, false, true); },
-    function () { qeItem.setSpeed(speed, false, false); },
-    function () { qeItem.setSpeed(speed, false); },
-    function () { qeItem.setSpeed(speed); }
-  ];
-  for (var i = 0; i < attempts.length; i++) {
-    try {
-      attempts[i]();
-      return true;
-    } catch (e) {
-      // tenta a próxima assinatura
-    }
-  }
-  return false;
-}
-
 // A QE DOM (legada/não documentada) expressa tempo em "ticks" (254016000000 por
 // segundo). O formato exato de qeItem.start/.inPoint/.outPoint varia entre versões
 // do Premiere: às vezes é um número (ou string) cru de ticks, às vezes um objeto
@@ -293,10 +240,6 @@ function _qeTicksToSeconds(val) {
 
   var n = parseFloat(val);
   return isNaN(n) ? NaN : n / _TICKS_PER_SECOND;
-}
-
-function _findQeItem(seq, trackItem) {
-  return _findQeItemGeneric(seq, trackItem, "Video");
 }
 
 // mediaType: "Video" | "Audio"
@@ -1328,7 +1271,8 @@ function _findTrackItemAtStart(track, seconds) {
 // Remove um clipe da timeline (lift — não desloca os demais clipes da trilha,
 // só libera o espaço). A contagem/ordem de parâmetros de QETrackItem.remove()
 // não é documentada e varia entre versões do Premiere (mesma classe de
-// problema já resolvida em _qeSetSpeed) — tenta várias assinaturas conhecidas.
+// problema de outras chamadas via QE DOM neste arquivo) — tenta várias
+// assinaturas conhecidas.
 function _qeRemoveClip(qeItem) {
   var attempts = [
     function () { qeItem.remove(false, true); },
