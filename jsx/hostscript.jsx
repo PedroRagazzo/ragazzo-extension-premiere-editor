@@ -1201,13 +1201,17 @@ function applyColorPreset(preset, amount) {
 }
 
 // ---------- LUT (presets/*.cube) ----------
-// Tenta aplicar um arquivo .cube no parâmetro "LUT de Entrada" (Input LUT) do
-// efeito Lumetri Color já aplicado ao clipe. Diferente de Temperature/
-// Contrast/Saturation (numéricos, comuns em scripts), essa propriedade
-// específica não é documentada na API do Premiere — tenta os nomes internos
-// mais prováveis; se nenhum aceitar o valor, devolve o caminho do arquivo
-// pra aplicação manual em vez de fingir sucesso.
-// lutPath: "" tenta LIMPAR o LUT de entrada (voltar ao "Nenhum").
+// Tenta aplicar um arquivo .cube no parâmetro "Visual" (Look, aba Criativo) do
+// efeito Lumetri Color já aplicado ao clipe. Usa "Look" em vez de "Input LUT"
+// (aba Correção Básica) porque, em várias versões do Premiere, "LUT de
+// Entrada" é um índice numérico pra uma lista interna (não aceita caminho de
+// arquivo novo) — "Visual" é o outro lugar do Lumetri Color que aceita LUTs
+// customizados via arquivo. Diferente de Temperature/Contrast/Saturation
+// (numéricos, comuns em scripts), essa propriedade específica não é
+// documentada na API do Premiere — tenta os nomes internos mais prováveis;
+// se nenhum aceitar o valor, devolve o caminho do arquivo pra aplicação
+// manual em vez de fingir sucesso.
+// lutPath: "" tenta LIMPAR o Visual (voltar ao "Nenhum").
 // Descreve um valor de forma segura (sem lançar exceção mesmo pra objetos
 // exóticos do lado nativo do Premiere) — só pra diagnóstico em mensagens de
 // erro, não pra lógica.
@@ -1262,7 +1266,7 @@ function applyLutToClip(lutPath) {
     var items = _getSelectedVideoItems(seq);
     if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
 
-    var LUT_PARAM_NAMES = ["Input LUT", "LUT de Entrada", "Entrada de LUT"];
+    var LUT_PARAM_NAMES = ["Look", "Visual", "Pesquisar Visual"];
     var applied = 0;
     var missingLumetri = 0;
     var missingParam = 0;
@@ -1316,16 +1320,16 @@ function applyLutToClip(lutPath) {
     }
 
     var manualStep = lutPath
-      ? "Abra o Lumetri Color no clipe, vá em Correção Básica > LUT de Entrada e selecione manualmente: " + lutPath
-      : "Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
+      ? "Abra o Lumetri Color no clipe, vá em Criativo > Visual e selecione manualmente: " + lutPath
+      : "Abra o Lumetri Color no clipe e remova manualmente em Criativo > Visual.";
 
     // Conclusão, não mais só "tentativa": se o valor atual do parâmetro é NUMÉRICO,
-    // "LUT de Entrada" nesta versão do Premiere é um índice pra uma lista interna
-    // de LUTs já conhecidos (não um caminho de arquivo) — não há como calcular por
+    // "Visual" nesta versão do Premiere é um índice pra uma lista interna
+    // de Looks já conhecidos (não um caminho de arquivo) — não há como calcular por
     // script o índice de um arquivo novo que o Premiere ainda não carregou, então
     // nem vale insistir tentando outros formatos.
     if (setThrewNumericEnum > 0) {
-      return "erro:Nesta versão do Premiere, 'LUT de Entrada' é controlado por um número interno (índice de uma lista de LUTs já conhecidos pelo Premiere), não por um caminho de arquivo — não dá pra aplicar um LUT novo por script aqui. " + manualStep;
+      return "erro:Nesta versão do Premiere, 'Visual' é controlado por um número interno (índice de uma lista de Looks já conhecidos pelo Premiere), não por um caminho de arquivo — não dá pra aplicar um LUT novo por script aqui. " + manualStep;
     }
     if (setThrew > 0) {
       return "erro:Encontrei o parâmetro de LUT, mas nenhuma das formas que tentei de passar o valor funcionou. Diagnóstico: " +
@@ -1333,7 +1337,7 @@ function applyLutToClip(lutPath) {
     }
     // missingParam > 0: nenhum dos 3 nomes tentados bateu — devolve a lista real de
     // parâmetros do Lumetri Color pra eu poder acrescentar o nome certo na próxima versão.
-    return "erro:Não achei o parâmetro de LUT nesta versão do Premiere (tentei: " + LUT_PARAM_NAMES.join(", ") +
+    return "erro:Não achei o parâmetro de Visual (Look) nesta versão do Premiere (tentei: " + LUT_PARAM_NAMES.join(", ") +
       "). Parâmetros reais do Lumetri Color neste clipe: [" + (discoveredNames || []).join(", ") + "]. " + manualStep;
   } catch (e) {
     return "erro:" + e.toString();
