@@ -1200,6 +1200,57 @@ function applyColorPreset(preset, amount) {
   }
 }
 
+// ---------- LUT (presets/*.cube) ----------
+// Tenta aplicar um arquivo .cube no parâmetro "LUT de Entrada" (Input LUT) do
+// efeito Lumetri Color já aplicado ao clipe. Diferente de Temperature/
+// Contrast/Saturation (numéricos, comuns em scripts), essa propriedade
+// específica não é documentada na API do Premiere — tenta os nomes internos
+// mais prováveis; se nenhum aceitar o valor, devolve o caminho do arquivo
+// pra aplicação manual em vez de fingir sucesso.
+// lutPath: "" tenta LIMPAR o LUT de entrada (voltar ao "Nenhum").
+function applyLutToClip(lutPath) {
+  try {
+    var seq = _requireSequence();
+    var items = _getSelectedVideoItems(seq);
+    if (items.length === 0) return "erro:Selecione ao menos um clipe de vídeo na timeline.";
+
+    var LUT_PARAM_NAMES = ["Input LUT", "LUT de Entrada", "Entrada de LUT"];
+    var applied = 0;
+    var missingLumetri = 0;
+    var missingParam = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var lumetri = _findComponent(item, "Lumetri Color");
+      if (!lumetri) { missingLumetri++; continue; }
+
+      var param = null;
+      for (var n = 0; n < LUT_PARAM_NAMES.length; n++) {
+        param = _findParam(lumetri, LUT_PARAM_NAMES[n]);
+        if (param) break;
+      }
+      if (!param) { missingParam++; continue; }
+
+      try {
+        param.setValue(lutPath, true);
+        applied++;
+      } catch (eSet) {
+        missingParam++; // parâmetro existe mas não aceitou o valor — mesmo desfecho que "não achei"
+      }
+    }
+
+    if (applied > 0) return "ok:" + applied + " clipe(s)";
+    if (missingLumetri > 0 && missingParam === 0) {
+      return "erro:Nenhum clipe selecionado tem o efeito 'Lumetri Color' aplicado. Adicione-o pelo painel Efeitos do Premiere e tente de novo.";
+    }
+    return lutPath
+      ? "erro:Não consegui aplicar o LUT automaticamente nesta versão do Premiere. Abra o Lumetri Color no clipe, vá em Correção Básica > LUT de Entrada e selecione manualmente: " + lutPath
+      : "erro:Não consegui limpar o LUT de entrada automaticamente nesta versão do Premiere. Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
+  } catch (e) {
+    return "erro:" + e.toString();
+  }
+}
+
 // ---------- CORTE AUTOMÁTICO DE SILÊNCIO ----------
 // A detecção/corte roda no Node.js do painel (ffmpeg); estas funções só entregam
 // os dados do clipe selecionado e, depois, importam + posicionam o arquivo já cortado.

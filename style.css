@@ -1071,4 +1071,63 @@ button.primary:active { transform: scale(0.97); }
   height: 8px;
   border-radius: 50%;
 }
+
+/* ---------- grade de LUTs (card Cor) ---------- */
+
+.lut-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.lut-cell {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 5px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.lut-cell:hover { border-color: #4a453d; }
+
+.lut-cell.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.lut-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lut-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  display: block;
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.lut-name {
+  font-size: 9.5px;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lut-cell.selected .lut-name { color: var(--accent-2); font-weight: 600; }
+
+.lut-cell-original .lut-name { font-style: italic; }
 .curve-preset-del:hover { color: var(--err); background: transparent; }

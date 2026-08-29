@@ -478,6 +478,16 @@
             <input type="number" id="color-amount" class="slider-number" value="15" min="1" max="100" />
           </div>
           <button class="primary" id="apply-color">Aplicar cor</button>
+
+          <p class="hint section-sep">LUTs — coloque arquivos <code>.cube</code> na pasta <code>presets</code> dentro da extensão. Cada miniatura mostra o LUT aplicado num cartão de referência (matizes, tons de pele e uma rampa de cinza).</p>
+          <div id="lut-grid" class="lut-grid"></div>
+          <p class="hint" id="lut-empty-hint" style="display:none">Nenhum arquivo .cube encontrado em <code>presets/</code>. Copie seus LUTs pra essa pasta e clique em "Recarregar".</p>
+          <div class="btn-group">
+            <button type="button" id="lut-reveal">Abrir pasta presets</button>
+            <button type="button" id="lut-refresh">Recarregar</button>
+          </div>
+          <button class="primary" id="apply-lut">Aplicar LUT selecionado</button>
+          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe. Se a sua versão do Premiere não permitir aplicar o LUT automaticamente, a mensagem mostra o caminho do arquivo pra você selecionar manualmente em Lumetri Color → Correção Básica → LUT de Entrada.</p>
         </div>
       </div>
     </div>
@@ -545,6 +555,8 @@
   <script src="js/curves.js"></script>
   <script src="js/graph.js"></script>
   <script src="js/curve-presets.js"></script>
+  <script src="js/lut-cube.js"></script>
+  <script src="js/lut-panel.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
 </body>

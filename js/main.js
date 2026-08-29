@@ -263,6 +263,73 @@
     run("applyColorPreset('" + preset + "', " + JSON.stringify(amount) + ")");
   });
 
+  // ---------- LUTs (presets/*.cube) ----------
+  var lutGrid = document.getElementById("lut-grid");
+  var lutEmptyHint = document.getElementById("lut-empty-hint");
+  var lutSelectedPath = ""; // "" = célula "Original" (sem LUT)
+
+  function makeLutCell(entry) {
+    var cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "lut-cell";
+    cell.title = entry.name;
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "lut-thumb";
+    canvas.width = 160;
+    canvas.height = 100;
+    cell.appendChild(canvas);
+
+    var label = document.createElement("span");
+    label.className = "lut-name";
+    label.textContent = entry.name;
+    cell.appendChild(label);
+
+    cell.addEventListener("click", function () {
+      Array.prototype.forEach.call(lutGrid.querySelectorAll(".lut-cell"), function (c) { c.classList.remove("selected"); });
+      cell.classList.add("selected");
+      lutSelectedPath = entry.path;
+    });
+
+    // adiada, pra não travar a UI se a pasta tiver muitos LUTs
+    setTimeout(function () {
+      var lut = entry.path ? LutPanel.loadLut(entry.path) : null;
+      LutPanel.renderThumb(canvas, lut);
+    }, 0);
+
+    return cell;
+  }
+
+  function renderLutGrid() {
+    if (typeof LutPanel === "undefined") return;
+    lutGrid.innerHTML = "";
+    lutSelectedPath = "";
+
+    var originalCell = makeLutCell({ name: "Original", path: "" });
+    originalCell.classList.add("lut-cell-original", "selected");
+    lutGrid.appendChild(originalCell);
+
+    var files = LutPanel.listCubeFiles();
+    lutEmptyHint.style.display = files.length === 0 ? "" : "none";
+    files.forEach(function (f) { lutGrid.appendChild(makeLutCell(f)); });
+  }
+
+  renderLutGrid();
+
+  document.getElementById("lut-refresh").addEventListener("click", renderLutGrid);
+
+  document.getElementById("lut-reveal").addEventListener("click", function () {
+    var ok = typeof LutPanel !== "undefined" && LutPanel.openPresetsFolder();
+    if (!ok) {
+      var dir = (typeof LutPanel !== "undefined" && LutPanel.presetsDir()) || "presets/ dentro da pasta da extensão";
+      setMessage("Não consegui abrir a pasta automaticamente. Ela fica em: " + dir, "err");
+    }
+  });
+
+  document.getElementById("apply-lut").addEventListener("click", function () {
+    run("applyLutToClip(" + JSON.stringify(lutSelectedPath) + ")");
+  });
+
   document.getElementById("apply-smooth").addEventListener("click", function () {
     run("applySmoothMotion()");
   });
