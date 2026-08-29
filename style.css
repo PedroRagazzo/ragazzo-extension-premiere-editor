@@ -263,10 +263,39 @@ main {
 
 .icon-split-fill { fill: currentColor; opacity: 0; animation: kf-blink-soft 2.2s ease-in-out infinite; }
 
-.icon-bar { transform-box: fill-box; transform-origin: bottom; animation: kf-bar 1.1s ease-in-out infinite; }
-@keyframes kf-bar {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
+/* Três barras de altura desigual que convergem periodicamente pra uma altura
+   comum (a linha-guia tracejada) e voltam a divergir — a metáfora visual do
+   próprio recurso: nivelar é "puxar tudo pra uma referência comum". */
+.icon-level-a, .icon-level-b, .icon-level-c {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation-duration: 2.4s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.icon-level-a { animation-name: kf-level-a; }
+.icon-level-b { animation-name: kf-level-b; }
+.icon-level-c { animation-name: kf-level-c; }
+@keyframes kf-level-a {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(0.8); }
+}
+@keyframes kf-level-b {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.8); }
+}
+@keyframes kf-level-c {
+  0%, 100% { transform: scaleY(0.55); }
+  50% { transform: scaleY(0.8); }
+}
+.icon-level-guide {
+  stroke-dasharray: 1.5 2;
+  opacity: 0;
+  animation: kf-level-guide 2.4s ease-in-out infinite;
+}
+@keyframes kf-level-guide {
+  0%, 35%, 65%, 100% { opacity: 0; }
+  50% { opacity: .6; }
 }
 
 .icon-cascade {
@@ -321,7 +350,7 @@ main {
 
 @media (prefers-reduced-motion: reduce) {
   .icon-zoom-group, .icon-fade, .icon-align-dot, .icon-crop-a, .icon-crop-b,
-  .icon-split-fill, .icon-bar, .icon-slide-box,
+  .icon-split-fill, .icon-level-a, .icon-level-b, .icon-level-c, .icon-level-guide, .icon-slide-box,
   .icon-wave-jagged, .icon-wave-smooth, .icon-cascade, .icon-cutgap {
     animation: none !important;
   }
@@ -1056,3 +1085,35 @@ button.primary:active { transform: scale(0.97); }
 }
 
 .curve-preset-del:hover { color: var(--err); background: transparent; }
+
+/* ---------- curvas de nivelamento (card Nivelar voz) ---------- */
+
+.level-graph-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.level-graph-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 9px;
+}
+
+.level-graph-label {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.level-graph-canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 460 / 90;
+  display: block;
+  border-radius: 4px;
+}
