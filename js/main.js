@@ -507,9 +507,12 @@
               function (finalResult) {
                 if (typeof finalResult === "string" && finalResult.indexOf("ok:") === 0) {
                   var removedTxt = cutResult.removedSeconds.toFixed(1);
+                  // a parte depois de "ok:" já diz se o original foi substituído
+                  // ou só inserido ao lado (com aviso) — repassa em vez de fixar
+                  // sempre "inserido na timeline".
                   setMessage(
                     "Cortado! " + removedTxt + "s de pausa removidos (" + cutResult.keepCount + " trechos de fala)" +
-                      thresholdTxt + ". Inserido na timeline.",
+                      thresholdTxt + ". " + finalResult.slice(3) + ".",
                     "ok"
                   );
                 } else {

@@ -1317,6 +1317,37 @@ function getClipSourceForSilenceCut() {
   }
 }
 
+function _findTrackItemAtStart(track, seconds) {
+  for (var c = 0; c < track.clips.numItems; c++) {
+    var clip = track.clips[c];
+    if (Math.abs(clip.start.seconds - seconds) < 0.05) return clip;
+  }
+  return null;
+}
+
+// Remove um clipe da timeline (lift — não desloca os demais clipes da trilha,
+// só libera o espaço). A contagem/ordem de parâmetros de QETrackItem.remove()
+// não é documentada e varia entre versões do Premiere (mesma classe de
+// problema já resolvida em _qeSetSpeed) — tenta várias assinaturas conhecidas.
+function _qeRemoveClip(qeItem) {
+  var attempts = [
+    function () { qeItem.remove(false, true); },
+    function () { qeItem.remove(false, false); },
+    function () { qeItem.remove(true, true); },
+    function () { qeItem.remove(false); },
+    function () { qeItem.remove(); }
+  ];
+  for (var i = 0; i < attempts.length; i++) {
+    try {
+      attempts[i]();
+      return true;
+    } catch (e) {
+      // tenta a próxima assinatura
+    }
+  }
+  return false;
+}
+
 function _findProjectItemByPath(item, targetPath) {
   for (var i = 0; i < item.children.numItems; i++) {
     var child = item.children[i];
@@ -1333,7 +1364,17 @@ function _findProjectItemByPath(item, targetPath) {
   return null;
 }
 
-// Importa o arquivo já cortado (gerado pelo ffmpeg) e insere na timeline.
+// Importa o arquivo já cortado (gerado pelo ffmpeg) e SUBSTITUI o clipe original
+// pela versão cortada, no mesmo lugar. timelineStartSeconds é o início do clipe
+// original (não a "seleção atual" — entre o corte ser calculado e este passo
+// rodar, o processamento no ffmpeg leva um tempo e a seleção no Premiere pode
+// ter mudado, então localizamos o clipe pela POSIÇÃO conhecida, não por seleção).
+//
+// Passos: acha o clipe original nessa posição -> remove ele (lift, sem
+// deslocar o resto da trilha) -> sobrepõe (overwrite) a versão cortada no
+// espaço liberado, começando no mesmo ponto. Como o corte remove trechos de
+// silêncio, o resultado é MENOR que o espaço liberado — sobra um vão vazio
+// depois dele (não deslocamos os clipes seguintes automaticamente).
 function importAndPlaceCutFile(filePath, mediaType, trackIndex, timelineStartSeconds) {
   try {
     var seq = _requireSequence();
@@ -1348,11 +1389,28 @@ function importAndPlaceCutFile(filePath, mediaType, trackIndex, timelineStartSec
     var tracks = mediaType === "Audio" ? seq.audioTracks : seq.videoTracks;
     if (tIdx < 0 || tIdx >= tracks.numTracks) return "erro:Trilha de destino inválida.";
     var track = tracks[tIdx];
+    var startSec = parseFloat(timelineStartSeconds);
 
-    var inserted = track.insertClip(imported, parseFloat(timelineStartSeconds));
-    return inserted
-      ? "ok:1 clipe cortado inserido na timeline"
-      : "erro:O arquivo foi cortado e importado, mas a inserção automática na timeline falhou — arraste-o manualmente do painel de Projeto.";
+    var originalItem = _findTrackItemAtStart(track, startSec);
+    var removedOriginal = false;
+    if (originalItem) {
+      try {
+        if (typeof app.enableQE === "function") app.enableQE();
+        var qeOriginal = _findQeItemGeneric(seq, originalItem, mediaType);
+        if (qeOriginal) removedOriginal = _qeRemoveClip(qeOriginal);
+      } catch (eRemove) {
+        removedOriginal = false;
+      }
+    }
+
+    var placed = track.overwriteClip(imported, startSec);
+    if (!placed) {
+      return "erro:O arquivo foi cortado e importado, mas a inserção automática na timeline falhou — arraste-o manualmente do painel de Projeto.";
+    }
+
+    return removedOriginal
+      ? "ok:substituiu o clipe original na timeline"
+      : "ok:inserido na timeline, mas não consegui remover automaticamente o clipe original nesta versão do Premiere — se ficou um clipe extra/duplicado, apague-o manualmente";
   } catch (e) {
     return "erro:" + e.toString();
   }
