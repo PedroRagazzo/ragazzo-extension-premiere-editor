@@ -221,21 +221,6 @@
     });
   });
 
-  document.getElementById("apply-duck").addEventListener("click", function () {
-    var voiceTrack = document.getElementById("duck-voice-track").value;
-    var musicTrack = document.getElementById("duck-music-track").value;
-    var amount = document.getElementById("duck-amount").value;
-    var fade = document.getElementById("duck-fade").value;
-    run(
-      "applyDucking(" +
-        JSON.stringify(voiceTrack) + ", " +
-        JSON.stringify(musicTrack) + ", " +
-        JSON.stringify(amount) + ", " +
-        JSON.stringify(fade) +
-        ")"
-    );
-  });
-
   var animPresetGrid = document.getElementById("anim-preset-grid");
   var animPresetButtons = animPresetGrid.querySelectorAll(".anim-preset-btn");
   Array.prototype.forEach.call(animPresetButtons, function (btn) {
@@ -255,101 +240,6 @@
     var duration = document.getElementById("anim-duration").value;
     var easing = document.getElementById("anim-easing").value;
     run("applyAnimateClip('" + preset + "', " + JSON.stringify(duration) + ", '" + easing + "')");
-  });
-
-  document.getElementById("apply-color").addEventListener("click", function () {
-    var preset = document.getElementById("color-preset").value;
-    var amount = document.getElementById("color-amount").value;
-    run("applyColorPreset('" + preset + "', " + JSON.stringify(amount) + ")");
-  });
-
-  // ---------- LUTs (presets/*.cube) ----------
-  var lutGrid = document.getElementById("lut-grid");
-  var lutEmptyHint = document.getElementById("lut-empty-hint");
-  var lutSelectedPath = ""; // "" = célula "Original" (sem LUT)
-  // imagem de referência do render em andamento — carregada 1x por
-  // renderLutGrid() (não por célula) e compartilhada entre todas as miniaturas;
-  // presets/preview.jpg|jpeg|png (se existir) substitui o cartão sintético.
-  var lutReferenceImage = null;
-
-  function makeLutCell(entry) {
-    var cell = document.createElement("button");
-    cell.type = "button";
-    cell.className = "lut-cell";
-    cell.title = entry.name;
-
-    var canvas = document.createElement("canvas");
-    canvas.className = "lut-thumb";
-    canvas.width = 160;
-    canvas.height = 100;
-    cell.appendChild(canvas);
-
-    var label = document.createElement("span");
-    label.className = "lut-name";
-    label.textContent = entry.name;
-    cell.appendChild(label);
-
-    cell.addEventListener("click", function () {
-      Array.prototype.forEach.call(lutGrid.querySelectorAll(".lut-cell"), function (c) { c.classList.remove("selected"); });
-      cell.classList.add("selected");
-      lutSelectedPath = entry.path;
-    });
-
-    // adiada, pra não travar a UI se a pasta tiver muitos LUTs
-    setTimeout(function () {
-      var lut = entry.path ? LutPanel.loadLut(entry.path) : null;
-      LutPanel.renderThumb(canvas, lut, lutReferenceImage);
-    }, 0);
-
-    return cell;
-  }
-
-  function renderLutGrid() {
-    if (typeof LutPanel === "undefined") return;
-    LutPanel.loadCustomPreviewImage(function (img) {
-      lutReferenceImage = img;
-      lutGrid.innerHTML = "";
-      lutSelectedPath = "";
-
-      var originalCell = makeLutCell({ name: "Original", path: "" });
-      originalCell.classList.add("lut-cell-original", "selected");
-      lutGrid.appendChild(originalCell);
-
-      var files = LutPanel.listCubeFiles();
-      lutEmptyHint.style.display = files.length === 0 ? "" : "none";
-      files.forEach(function (f) { lutGrid.appendChild(makeLutCell(f)); });
-    });
-  }
-
-  renderLutGrid();
-
-  document.getElementById("lut-refresh").addEventListener("click", renderLutGrid);
-
-  document.getElementById("lut-reveal").addEventListener("click", function () {
-    var ok = typeof LutPanel !== "undefined" && LutPanel.openPresetsFolder();
-    if (!ok) {
-      var dir = (typeof LutPanel !== "undefined" && LutPanel.presetsDir()) || "presets/ dentro da pasta da extensão";
-      setMessage("Não consegui abrir a pasta automaticamente. Ela fica em: " + dir, "err");
-    }
-  });
-
-  document.getElementById("apply-lut").addEventListener("click", function () {
-    run("applyLutToClip(" + JSON.stringify(lutSelectedPath) + ")");
-  });
-
-  document.getElementById("lut-copy-path").addEventListener("click", function () {
-    if (!lutSelectedPath) {
-      setMessage('Selecione um LUT primeiro (a célula "Original" não tem arquivo).', "err");
-      return;
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(lutSelectedPath).then(
-        function () { setMessage("Caminho copiado: " + lutSelectedPath, "ok"); },
-        function () { setMessage("Não consegui copiar. Caminho: " + lutSelectedPath, "err"); }
-      );
-    } else {
-      setMessage("Cópia automática indisponível. Caminho: " + lutSelectedPath, "err");
-    }
   });
 
   document.getElementById("apply-smooth").addEventListener("click", function () {

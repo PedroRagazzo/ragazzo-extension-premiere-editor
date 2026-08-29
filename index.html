@@ -25,7 +25,7 @@
     </span>
     <div class="brand-text">
       <h1>Ragazzo Editor · Efeitos</h1>
-      <p>Zoom, cor e mais para o clipe selecionado</p>
+      <p>Zoom, alinhamento e mais para o clipe selecionado</p>
     </div>
     <div class="theme-switch" role="group" aria-label="Tema do painel">
       <button type="button" class="theme-swatch" data-theme-choice="escuro" title="Tema escuro" aria-pressed="true">
@@ -42,7 +42,7 @@
   </header>
 
   <main>
-    <div class="effect-card open">
+    <div class="effect-card">
       <button type="button" class="effect-header">
         <span class="effect-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-zoom-group">
@@ -322,43 +322,6 @@
     <div class="effect-card">
       <button type="button" class="effect-header">
         <span class="effect-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line class="icon-duck-a" x1="8" y1="18" x2="8" y2="6"/>
-            <line class="icon-duck-b" x1="16" y1="18" x2="16" y2="6"/>
-          </svg>
-        </span>
-        <span class="effect-title">Áudio Intercalado</span>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="effect-body">
-        <div class="effect-body-inner">
-          <p class="hint">Abaixa a música automaticamente onde houver clipes na trilha de voz (ducking), com fade suave.</p>
-          <div class="row">
-            <label for="duck-voice-track">Trilha de voz (nº)</label>
-            <input type="number" id="duck-voice-track" value="1" min="1" max="20" />
-          </div>
-          <div class="row">
-            <label for="duck-music-track">Trilha de música (nº)</label>
-            <input type="number" id="duck-music-track" value="2" min="1" max="20" />
-          </div>
-          <div class="row slider-row">
-            <label for="duck-amount">Redução</label>
-            <input type="range" id="duck-amount-range" class="slider" min="-40" max="0" step="1" value="-12" />
-            <input type="number" id="duck-amount" class="slider-number" value="-12" min="-40" max="0" />
-          </div>
-          <div class="row slider-row">
-            <label for="duck-fade">Fade</label>
-            <input type="range" id="duck-fade-range" class="slider" min="0.05" max="2" step="0.05" value="0.4" />
-            <input type="number" id="duck-fade" class="slider-number" value="0.4" min="0.05" max="5" step="0.05" />
-          </div>
-          <button class="primary" id="apply-duck">Aplicar ducking</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="effect-card">
-      <button type="button" class="effect-header">
-        <span class="effect-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect class="icon-slide-box" x="4" y="8" width="8" height="8" rx="1.5"/>
             <line x1="15" y1="12" x2="20.5" y2="12"/>
@@ -452,50 +415,6 @@
     <div class="effect-card">
       <button type="button" class="effect-header">
         <span class="effect-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-hue">
-            <circle cx="12" cy="12" r="7"/>
-            <path d="M12 5a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" opacity=".35"/>
-          </svg>
-        </span>
-        <span class="effect-title">Cor</span>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="effect-body">
-        <div class="effect-body-inner">
-          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe (a API do Premiere não permite adicionar efeitos novos via script).</p>
-          <div class="row">
-            <label for="color-preset">Predefinição</label>
-            <select id="color-preset">
-              <option value="quente">Mais quente</option>
-              <option value="frio">Mais frio</option>
-              <option value="contraste">Mais contraste</option>
-              <option value="vivido">Mais vívido</option>
-            </select>
-          </div>
-          <div class="row slider-row">
-            <label for="color-amount">Intensidade</label>
-            <input type="range" id="color-amount-range" class="slider" min="1" max="50" step="1" value="15" />
-            <input type="number" id="color-amount" class="slider-number" value="15" min="1" max="100" />
-          </div>
-          <button class="primary" id="apply-color">Aplicar cor</button>
-
-          <p class="hint section-sep">LUTs — coloque arquivos <code>.cube</code> na pasta <code>presets</code> dentro da extensão. Cada miniatura mostra o LUT aplicado num cartão de referência (matizes, tons de pele e uma rampa de cinza). Quer usar sua própria imagem? Coloque um arquivo <code>preview.jpg</code> (ou <code>.png</code>) nessa mesma pasta — ele substitui o cartão em todas as miniaturas automaticamente.</p>
-          <div id="lut-grid" class="lut-grid"></div>
-          <p class="hint" id="lut-empty-hint" style="display:none">Nenhum arquivo .cube encontrado em <code>presets/</code>. Copie seus LUTs pra essa pasta e clique em "Recarregar".</p>
-          <div class="btn-group">
-            <button type="button" id="lut-reveal">Abrir pasta presets</button>
-            <button type="button" id="lut-refresh">Recarregar</button>
-            <button type="button" id="lut-copy-path">Copiar caminho</button>
-          </div>
-          <button class="primary" id="apply-lut">Aplicar LUT selecionado</button>
-          <p class="hint">Requer o efeito "Lumetri Color" já aplicado ao clipe. Tenta aplicar via "Visual" (aba Criativo) em vez de "LUT de Entrada". Em muitas versões do Premiere, "Visual" também é controlado por um índice interno (não por um caminho de arquivo), e a API de script não permite escolher um Visual novo nele — nesse caso o botão só serve pra escolher/pré-visualizar; a mensagem mostra o caminho do arquivo pra você selecionar manualmente em Lumetri Color → Criativo → Visual.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="effect-card">
-      <button type="button" class="effect-header">
-        <span class="effect-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path class="icon-wave-jagged" d="M3 16l4-8 4 8 4-8 4 8 3-6"/>
             <path class="icon-wave-smooth" d="M3 13c3-5 6-5 9 0s6 5 9 0" />
@@ -556,8 +475,6 @@
   <script src="js/curves.js"></script>
   <script src="js/graph.js"></script>
   <script src="js/curve-presets.js"></script>
-  <script src="js/lut-cube.js"></script>
-  <script src="js/lut-panel.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
 </body>
