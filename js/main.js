@@ -281,6 +281,10 @@
   var graph = new EZGraph(document.getElementById("curve-canvas"), {});
   graph.setCurve(CurvePresets.toCurve(CurvePresets.builtins[9])); // "In-Out"
 
+  // o canvas lê cores via getComputedStyle (não CSS puro) — precisa ser
+  // avisado quando o trocador de tema (js/theme.js) mudar a paleta.
+  window.addEventListener("ragazzo-theme-changed", function () { graph.draw(); });
+
   // O canvas nasce com tamanho zero enquanto o card está fechado; o EZGraph lê
   // getBoundingClientRect() no construtor, então precisa remedir quando o card
   // abre (e quando o painel muda de largura).

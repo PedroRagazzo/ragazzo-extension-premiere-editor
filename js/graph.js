@@ -23,24 +23,34 @@
     "use strict";
     var C = root.EFCurves;
 
-    // Paleta alinhada ao tema do painel (laranja + cinza bem escuro).
-    var COL = {
-        bg: "#161615",
-        unit: "#232221",
-        grid: "#37342f",
-        gridMinor: "#2a2826",
-        curve: "#ff7a26",
-        curveSpeed: "#ffa74d",
-        arm: "#7a736a",
-        handle: "#ffc78f",
-        handleRing: "#ffffff",
-        endpoint: "#f3efe9",
-        anchor: "#ffd24a",
-        anchorRing: "#161615",
-        preview: "#ffd24a",
-        label: "#9d968c",
-        snap: "#57c08a"
-    };
+    // Paleta lida das CSS custom properties do painel (não hardcoded), para o
+    // canvas acompanhar a troca de tema (escuro/papel) sem precisar duplicar
+    // o editor inteiro. Recalculada a cada draw() — o canvas é pequeno e o
+    // redesenho não é hot-path suficiente pra isso pesar.
+    function _readColors() {
+        var cs = getComputedStyle(document.documentElement);
+        function v(name, fallback) {
+            var val = cs.getPropertyValue(name);
+            return val ? val.trim() : fallback;
+        }
+        return {
+            bg: v("--bg", "#161615"),
+            unit: v("--card-hover", "#232221"),
+            grid: v("--border", "#37342f"),
+            gridMinor: v("--border-soft", "#2a2826"),
+            curve: v("--accent", "#ff7a26"),
+            curveSpeed: v("--accent-2", "#ffa74d"),
+            arm: v("--text-dim", "#7a736a"),
+            handle: v("--accent-2", "#ffc78f"),
+            handleRing: v("--panel", "#ffffff"),
+            endpoint: v("--text", "#f3efe9"),
+            anchor: "#ffd24a",
+            anchorRing: v("--bg", "#161615"),
+            preview: "#ffd24a",
+            label: v("--text-dim", "#9d968c"),
+            snap: v("--ok", "#57c08a")
+        };
+    }
 
     var SNAP_PX = 7;                      // engage distance in pixels
     var VALUE_Y_LANDMARKS = [0, 1];
@@ -174,9 +184,10 @@
 
     // ---- drawing -------------------------------------------------------------
     EZGraph.prototype.draw = function () {
+        this._col = _readColors();
         var ctx = this.ctx;
         ctx.clearRect(0, 0, this.w, this.h);
-        ctx.fillStyle = COL.bg;
+        ctx.fillStyle = this._col.bg;
         ctx.fillRect(0, 0, this.w, this.h);
         if (this.mode === "value") { this._drawValue(); }
         else { this._drawSpeed(); }
@@ -187,7 +198,7 @@
         var ctx = this.ctx;
         for (var i = 0; i <= 4; i++) {
             var x = this._gx(i / 4);
-            ctx.strokeStyle = (i === 0 || i === 4) ? COL.grid : COL.gridMinor;
+            ctx.strokeStyle = (i === 0 || i === 4) ? this._col.grid : this._col.gridMinor;
             ctx.beginPath();
             ctx.moveTo(x, this.pad.t);
             ctx.lineTo(x, this.h - this.pad.b);
@@ -198,7 +209,7 @@
     EZGraph.prototype._drawSnapGuides = function () {
         if (!this._snapGuides) { return; }
         var ctx = this.ctx, range = this._range();
-        ctx.strokeStyle = COL.snap;
+        ctx.strokeStyle = this._col.snap;
         ctx.setLineDash([4, 3]);
         if (typeof this._snapGuides.y === "number") {
             var gy = this._gy(this._snapGuides.y, range);
@@ -217,15 +228,15 @@
 
         // unit band 0..1
         var y0 = this._gy(0, range), y1 = this._gy(1, range);
-        ctx.fillStyle = COL.unit;
+        ctx.fillStyle = this._col.unit;
         ctx.fillRect(this.pad.l, y1, this.w - this.pad.l - this.pad.r, y0 - y1);
 
         this._drawGridX();
         [0, 0.5, 1].forEach(function (v) {
             var y = self._gy(v, range);
-            ctx.strokeStyle = COL.grid;
+            ctx.strokeStyle = self._col.grid;
             ctx.beginPath(); ctx.moveTo(self.pad.l, y); ctx.lineTo(self.w - self.pad.r, y); ctx.stroke();
-            ctx.fillStyle = COL.label;
+            ctx.fillStyle = self._col.label;
             ctx.font = "9px sans-serif";
             ctx.textAlign = "right";
             ctx.fillText(String(v), self.pad.l - 4, y + 3);
@@ -233,7 +244,7 @@
 
         // curve (clipped to the plot: with a frozen drag range it may exceed)
         this._clipPlot();
-        ctx.strokeStyle = COL.curve;
+        ctx.strokeStyle = this._col.curve;
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (var i = 0; i <= 160; i++) {
@@ -256,24 +267,24 @@
             if (showHandles) {
                 if (a.out) {
                     var ox = this._gx(a.x + a.out.dx), oy = this._gy(a.y + a.out.dy, range);
-                    ctx.strokeStyle = COL.arm;
+                    ctx.strokeStyle = this._col.arm;
                     ctx.beginPath(); ctx.moveTo(apx, apy); ctx.lineTo(ox, oy); ctx.stroke();
-                    this._dot(ox, oy, 5.5, COL.handle, true);
+                    this._dot(ox, oy, 5.5, this._col.handle, true);
                     this._hit.handles.push({ i: ai, side: "out", px: ox, py: oy });
                 }
                 if (a.in) {
                     var ix = this._gx(a.x + a.in.dx), iy = this._gy(a.y + a.in.dy, range);
-                    ctx.strokeStyle = COL.arm;
+                    ctx.strokeStyle = this._col.arm;
                     ctx.beginPath(); ctx.moveTo(apx, apy); ctx.lineTo(ix, iy); ctx.stroke();
-                    this._dot(ix, iy, 5.5, COL.handle, true);
+                    this._dot(ix, iy, 5.5, this._col.handle, true);
                     this._hit.handles.push({ i: ai, side: "in", px: ix, py: iy });
                 }
             }
 
             if (ai === 0 || ai === last) {
-                this._dot(apx, apy, 4, COL.endpoint);
+                this._dot(apx, apy, 4, this._col.endpoint);
             } else {
-                this._diamond(apx, apy, 5.5, ai === this.activeAnchor ? COL.anchor : COL.curve);
+                this._diamond(apx, apy, 5.5, ai === this.activeAnchor ? this._col.anchor : this._col.curve);
                 this._hit.anchors.push({ i: ai, px: apx, py: apy });
             }
         }
@@ -284,7 +295,7 @@
             var ph = this.previewPhase;
             if (ph >= 0 && ph <= 1) {
                 var pv = C.valueAt(c, ph);
-                this._dot(this._gx(ph), this._gy(pv, range), 4, COL.preview);
+                this._dot(this._gx(ph), this._gy(pv, range), 4, this._col.preview);
                 this._drawMotionBar(pv);
             }
         }
@@ -311,13 +322,13 @@
         var y = this.h - this.pad.b + 6;
 
         // track + start/rest ticks
-        ctx.fillStyle = COL.gridMinor;
+        ctx.fillStyle = this._col.gridMinor;
         ctx.fillRect(x0, y + 3, x1 - x0, 1);
-        ctx.fillStyle = COL.grid;
+        ctx.fillStyle = this._col.grid;
         ctx.fillRect(map(0) - 0.5, y + 1, 1, 6);
         ctx.fillRect(map(1) - 0.5, y, 1, 8);
 
-        ctx.fillStyle = COL.preview;
+        ctx.fillStyle = this._col.preview;
         ctx.fillRect(map(pv) - 1.5, y, 3, 8);
     };
 
@@ -328,9 +339,9 @@
         this._drawGridX();
         [0, 1].forEach(function (v) {
             var y = self._gy(v, range);
-            ctx.strokeStyle = COL.grid;
+            ctx.strokeStyle = self._col.grid;
             ctx.beginPath(); ctx.moveTo(self.pad.l, y); ctx.lineTo(self.w - self.pad.r, y); ctx.stroke();
-            ctx.fillStyle = COL.label;
+            ctx.fillStyle = self._col.label;
             ctx.font = "9px sans-serif";
             ctx.textAlign = "right";
             ctx.fillText(v === 1 ? "1x" : "0", self.pad.l - 4, y + 3);
@@ -340,7 +351,7 @@
         // vertical walls; clipped (not clamped) so mid-drag out-of-range parts
         // paint truthfully instead of flattening into plateaus
         this._clipPlot();
-        ctx.strokeStyle = COL.curveSpeed;
+        ctx.strokeStyle = this._col.curveSpeed;
         ctx.lineWidth = 2;
         for (var s = 0; s < c.anchors.length - 1; s++) {
             var xa = c.anchors[s].x, xb = c.anchors[s + 1].x;
@@ -360,11 +371,11 @@
         this._hit = { handles: [], anchors: [] };
         for (var m = 1; m < c.anchors.length - 1; m++) {
             var mx = this._gx(c.anchors[m].x);
-            ctx.strokeStyle = COL.gridMinor;
+            ctx.strokeStyle = this._col.gridMinor;
             ctx.setLineDash([2, 3]);
             ctx.beginPath(); ctx.moveTo(mx, this.pad.t); ctx.lineTo(mx, this.h - this.pad.b); ctx.stroke();
             ctx.setLineDash([]);
-            this._diamond(mx, this.h - this.pad.b - 5, 4, COL.gridMinor);
+            this._diamond(mx, this.h - this.pad.b - 5, 4, this._col.gridMinor);
         }
 
         // endpoint speed/influence handles
@@ -380,13 +391,13 @@
         var e0 = [this._gx(0), clampY(this._gy(vel.outgoing.speed, range))];
         var e1 = [this._gx(1), clampY(this._gy(vel.incoming.speed, range))];
 
-        ctx.strokeStyle = COL.arm;
+        ctx.strokeStyle = this._col.arm;
         ctx.beginPath(); ctx.moveTo(e0[0], e0[1]); ctx.lineTo(hOut[0], hOut[1]); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(e1[0], e1[1]); ctx.lineTo(hIn[0], hIn[1]); ctx.stroke();
-        this._dot(e0[0], e0[1], 4, COL.endpoint);
-        this._dot(e1[0], e1[1], 4, COL.endpoint);
-        this._dot(hOut[0], hOut[1], 5.5, COL.handle, true);
-        this._dot(hIn[0], hIn[1], 5.5, COL.handle, true);
+        this._dot(e0[0], e0[1], 4, this._col.endpoint);
+        this._dot(e1[0], e1[1], 4, this._col.endpoint);
+        this._dot(hOut[0], hOut[1], 5.5, this._col.handle, true);
+        this._dot(hIn[0], hIn[1], 5.5, this._col.handle, true);
         this._hit.handles.push({ i: 0, side: "out", px: hOut[0], py: hOut[1] });
         this._hit.handles.push({ i: c.anchors.length - 1, side: "in", px: hIn[0], py: hIn[1] });
         this._hitRange = range;
@@ -395,7 +406,7 @@
             var ph = this.previewPhase;
             if (ph >= 0 && ph <= 1) {
                 var spv = Math.max(range.lo, Math.min(range.hi, C.speedAt(c, ph)));
-                this._dot(this._gx(ph), this._gy(spv, range), 4, COL.preview);
+                this._dot(this._gx(ph), this._gy(spv, range), 4, this._col.preview);
                 this._drawMotionBar(C.valueAt(c, ph));
             }
         }
@@ -408,7 +419,7 @@
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
         if (ring) {
-            ctx.strokeStyle = COL.handleRing;
+            ctx.strokeStyle = this._col.handleRing;
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.stroke();
@@ -425,7 +436,7 @@
         ctx.lineTo(x - r, y);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = COL.anchorRing;
+        ctx.strokeStyle = this._col.anchorRing;
         ctx.stroke();
     };
 

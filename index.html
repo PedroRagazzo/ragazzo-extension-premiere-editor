@@ -3,6 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <title>Ragazzo Editor - Efeitos</title>
+  <script>
+    // Aplica o tema salvo ANTES do CSS pintar a tela, pra não piscar o tema
+    // escuro por uma fração de segundo quando o usuário escolheu "Papel".
+    (function () {
+      try {
+        if (localStorage.getItem("ragazzo.theme") === "papel") {
+          document.documentElement.setAttribute("data-theme", "papel");
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -15,6 +26,18 @@
     <div class="brand-text">
       <h1>Ragazzo Editor · Efeitos</h1>
       <p>Zoom, velocidade, cor e mais para o clipe selecionado</p>
+    </div>
+    <div class="theme-switch" role="group" aria-label="Tema do painel">
+      <button type="button" class="theme-swatch" data-theme-choice="escuro" title="Tema escuro" aria-pressed="true">
+        <span class="theme-swatch-bg" style="background:#161615">
+          <span class="theme-swatch-dot" style="background:#ff7a26"></span>
+        </span>
+      </button>
+      <button type="button" class="theme-swatch" data-theme-choice="papel" title="Tema papel" aria-pressed="false">
+        <span class="theme-swatch-bg" style="background:#f4efe4">
+          <span class="theme-swatch-dot" style="background:#2b2560"></span>
+        </span>
+      </button>
     </div>
   </header>
 
@@ -526,6 +549,7 @@
 
   <div id="status"><span class="spinner"></span><span class="status-text"></span></div>
 
+  <script src="js/theme.js"></script>
   <script src="js/cep-bridge.js"></script>
   <script src="js/loudness.js"></script>
   <script src="js/silence-cut.js"></script>

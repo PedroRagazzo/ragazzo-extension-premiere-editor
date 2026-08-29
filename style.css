@@ -1,4 +1,8 @@
 :root {
+  /* Diz ao Chromium que o tema escuro já é intencional — sem isto, o motor
+     tenta "corrigir" sozinho o contraste de widgets nativos (button, select)
+     e pode inverter as cores que definimos (ex.: botão claro num tema escuro). */
+  color-scheme: dark;
   --bg: #161615;
   --panel: #1d1c1b;
   --card: #232221;
@@ -13,6 +17,34 @@
   --accent-glow: rgba(255, 122, 38, 0.35);
   --ok: #57c08a;
   --err: #ef5f4d;
+}
+
+/* ---------- tema "Papel" — editorial claro, alternativa ao escuro acima ---------- */
+/* Troca de tema é só isto: os componentes existentes já leem as variáveis
+   acima, então redefini-las aqui re-skina quase tudo de graça. O resto
+   (card sem caixa, números de índice, campos sublinhados) é ajuste pontual
+   mais abaixo, sempre sob o seletor [data-theme="papel"]. */
+:root[data-theme="papel"] {
+  /* Propositalmente NÃO declara color-scheme:light aqui — nos testes, essa
+     combinação (appearance:none + color-scheme:light) fazia o motor de
+     renderização de widgets nativos pintar os botões de preto sólido, apesar
+     do CSS computado estar correto. Herdar "dark" do :root evita esse
+     caminho e não muda nada visível, já que todo o resto já é re-temado
+     via variável CSS explícita. */
+  --bg: #f4efe4;
+  --panel: #efe8d8;
+  --card: #f4efe4;
+  --card-hover: #e9e1cd;
+  --border: #cdbfa0;
+  --border-soft: #ddd0b3;
+  --text: #1c1a17;
+  --text-dim: #6b6252;
+  --accent: #2b2560;
+  --accent-2: #4a3fa0;
+  --accent-soft: rgba(43, 37, 96, 0.1);
+  --accent-glow: rgba(43, 37, 96, 0.28);
+  --ok: #2f6b4f;
+  --err: #a13b2c;
 }
 
 * { box-sizing: border-box; }
@@ -598,6 +630,12 @@ select:focus, input:focus {
 
 .slider-speed::-webkit-slider-thumb:active { cursor: grabbing; }
 
+/* o ícone ">>" do thumb é um SVG embutido — não lê CSS var(), então o tema
+   papel precisa da própria cópia (traço na cor do accent-2 daquele tema). */
+[data-theme="papel"] .slider-speed::-webkit-slider-thumb {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a3fa0' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 6 10 12 4 18'/%3E%3Cpolyline points='12 6 18 12 12 18'/%3E%3C/svg%3E");
+}
+
 @keyframes kf-speed-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
@@ -659,6 +697,8 @@ select:focus, input:focus {
 .preset-chip .preset-del:hover { color: var(--err); background: transparent; }
 
 button {
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -666,6 +706,7 @@ button {
   padding: 7px 8px;
   cursor: pointer;
   font-size: 11px;
+  font-family: inherit;
   transition: background 120ms ease, transform 80ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
@@ -894,4 +935,205 @@ button.primary:active { transform: scale(0.97); }
 }
 
 .curve-preset:hover .curve-preset-del { opacity: 1; }
+
+/* ================================================================
+   TEMA "PAPEL" — ajustes estruturais (além da troca de tokens acima)
+   Direção: editorial claro, tipografia serifada nos títulos, lista
+   numerada com hairlines em vez de cards em caixa, campos sublinhados.
+   Tudo abaixo só entra em vigor sob <html data-theme="papel">.
+   ================================================================ */
+
+[data-theme="papel"] body {
+  background:
+    radial-gradient(900px 260px at 50% -80px, rgba(43, 37, 96, 0.05), transparent 70%),
+    var(--bg);
+}
+
+[data-theme="papel"] header {
+  background: linear-gradient(180deg, rgba(43, 37, 96, 0.05), transparent);
+}
+
+[data-theme="papel"] header h1 {
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-weight: 400;
+  letter-spacing: .3px;
+}
+
+[data-theme="papel"] .brand-mark {
+  background: none;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  box-shadow: none;
+}
+
+/* lista numerada em vez de cards em caixa */
+
+[data-theme="papel"] main {
+  gap: 0;
+  padding: 4px 18px 28px;
+}
+
+[data-theme="papel"] .effect-card {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-theme="papel"] .effect-card:hover {
+  border-color: var(--border-soft);
+  box-shadow: none;
+}
+
+[data-theme="papel"] .effect-card.open {
+  border-color: var(--border-soft);
+  box-shadow: none;
+  background: var(--accent-soft);
+}
+
+[data-theme="papel"] main { counter-reset: ragazzo-idx; }
+[data-theme="papel"] .effect-card { counter-increment: ragazzo-idx; }
+
+[data-theme="papel"] .effect-header {
+  padding: 15px 4px;
+  gap: 14px;
+}
+
+[data-theme="papel"] .effect-header::before {
+  content: counter(ragazzo-idx, decimal-leading-zero);
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 15px;
+  color: var(--accent);
+  opacity: .55;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+[data-theme="papel"] .effect-title {
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 14.5px;
+  letter-spacing: .2px;
+}
+
+[data-theme="papel"] .effect-card.open .effect-header { color: var(--accent); }
+
+/* ícones viram traço fino, sem selo colorido */
+
+[data-theme="papel"] .effect-icon {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 50%;
+}
+
+[data-theme="papel"] .effect-header:hover .effect-icon,
+[data-theme="papel"] .effect-card.open .effect-icon {
+  background: none;
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: none;
+}
+
+[data-theme="papel"] .effect-card.open .effect-body-inner {
+  padding: 2px 4px 22px 42px;
+}
+
+/* campos sublinhados em vez de caixas */
+
+[data-theme="papel"] select,
+[data-theme="papel"] input[type="number"],
+[data-theme="papel"] input[type="text"] {
+  /* fundo opaco (não "none") — deixar transparente faz alguns motores de
+     renderização de widget nativo (select/button) pintarem um fallback
+     preto sólido em vez de deixar o papel aparecer por trás. */
+  background: var(--bg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 4px 2px;
+}
+
+[data-theme="papel"] select:focus,
+[data-theme="papel"] input:focus {
+  border-bottom: 1px solid var(--accent);
+  box-shadow: none;
+}
+
+[data-theme="papel"] button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+[data-theme="papel"] button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+[data-theme="papel"] button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+[data-theme="papel"] button.primary:hover {
+  filter: brightness(1.15);
+  box-shadow: none;
+}
+
+[data-theme="papel"] .preset-chip,
+[data-theme="papel"] .curve-preset,
+[data-theme="papel"] .anchor-cell,
+[data-theme="papel"] .anim-preset-btn,
+[data-theme="papel"] .seg-toggle,
+[data-theme="papel"] .curve-canvas,
+[data-theme="papel"] .anchor-grid {
+  background: var(--card-hover);
+}
+
+[data-theme="papel"] .anim-preset-btn.selected,
+[data-theme="papel"] .seg-btn.active {
+  background: var(--accent-soft);
+}
+
+/* trocador de tema no header */
+
+.theme-switch {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.theme-swatch {
+  all: unset;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 2px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 120ms ease, transform 80ms ease;
+}
+
+.theme-swatch:hover { transform: scale(1.1); }
+.theme-swatch[aria-pressed="true"] { border-color: var(--accent); }
+
+.theme-swatch-bg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25);
+}
+
+.theme-swatch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
 .curve-preset-del:hover { color: var(--err); background: transparent; }
