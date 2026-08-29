@@ -94,12 +94,76 @@
     ctx.fillRect(0, hueH + skinH, w, grayH);
   }
 
-  // Desenha a imagem de referência com a LUT aplicada (ou sem LUT nenhum, se
-  // lut === null, pra célula "Original"). w/h em pixels do canvas de destino.
-  function renderThumb(canvas, lut) {
+  // ---- imagem de referência personalizada (presets/preview.jpg|jpeg|png) -----
+  // Se o usuário colocar um arquivo com um desses nomes na pasta presets/, ele
+  // substitui o cartão sintético em TODAS as miniaturas — sem precisar editar
+  // código nenhum, só soltar o arquivo na pasta (mesmo lugar dos .cube).
+  var CUSTOM_PREVIEW_NAMES = ["preview.jpg", "preview.jpeg", "preview.png"];
+  var MIME_BY_EXT = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png" };
+
+  function findCustomPreviewPath() {
+    var dir = presetsDir();
+    if (!dir) return null;
+    for (var i = 0; i < CUSTOM_PREVIEW_NAMES.length; i++) {
+      var p = path.join(dir, CUSTOM_PREVIEW_NAMES[i]);
+      try {
+        if (fs.statSync(p).isFile()) return p;
+      } catch (e) {
+        // esse nome não existe — tenta o próximo
+      }
+    }
+    return null;
+  }
+
+  // Assíncrono (Image.onload é assíncrono). Chama cb(imgElement) se achou e
+  // decodificou uma imagem personalizada, ou cb(null) pra usar o cartão
+  // sintético (nenhum arquivo presente, ou falhou ao decodificar).
+  function loadCustomPreviewImage(cb) {
+    if (!hasNode) { cb(null); return; }
+    var p = findCustomPreviewPath();
+    if (!p) { cb(null); return; }
+    try {
+      var buf = fs.readFileSync(p);
+      var ext = path.extname(p).toLowerCase();
+      var mime = MIME_BY_EXT[ext] || "image/jpeg";
+      var img = new Image();
+      img.onload = function () { cb(img); };
+      img.onerror = function () { cb(null); };
+      img.src = "data:" + mime + ";base64," + buf.toString("base64");
+    } catch (e) {
+      cb(null);
+    }
+  }
+
+  // Desenha `img` cobrindo todo o retângulo w×h, cortando o excesso (mesma
+  // ideia de object-fit: cover) — pra imagens de proporção diferente do
+  // canvas não ficarem espremidas/distorcidas.
+  function drawImageCover(ctx, img, w, h) {
+    var ir = img.width / img.height;
+    var tr = w / h;
+    var sx, sy, sw, sh;
+    if (ir > tr) {
+      sh = img.height;
+      sw = sh * tr;
+      sx = (img.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.width;
+      sh = sw / tr;
+      sx = 0;
+      sy = (img.height - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  }
+
+  // Desenha a imagem de referência (personalizada, se fornecida — senão o
+  // cartão sintético) com a LUT aplicada (ou sem LUT nenhum, se lut === null,
+  // pra célula "Original"). w/h em pixels do canvas de destino.
+  function renderThumb(canvas, lut, referenceImage) {
     var w = canvas.width, h = canvas.height;
     var ctx = canvas.getContext("2d");
-    drawReferenceCard(ctx, w, h);
+    if (referenceImage) drawImageCover(ctx, referenceImage, w, h);
+    else drawReferenceCard(ctx, w, h);
     if (lut) {
       var imageData = ctx.getImageData(0, 0, w, h);
       LutCube.applyToImageData(lut, imageData);
@@ -128,6 +192,8 @@
     listCubeFiles: listCubeFiles,
     loadLut: loadLut,
     renderThumb: renderThumb,
-    openPresetsFolder: openPresetsFolder
+    openPresetsFolder: openPresetsFolder,
+    findCustomPreviewPath: findCustomPreviewPath,
+    loadCustomPreviewImage: loadCustomPreviewImage
   };
 })();

@@ -267,6 +267,10 @@
   var lutGrid = document.getElementById("lut-grid");
   var lutEmptyHint = document.getElementById("lut-empty-hint");
   var lutSelectedPath = ""; // "" = célula "Original" (sem LUT)
+  // imagem de referência do render em andamento — carregada 1x por
+  // renderLutGrid() (não por célula) e compartilhada entre todas as miniaturas;
+  // presets/preview.jpg|jpeg|png (se existir) substitui o cartão sintético.
+  var lutReferenceImage = null;
 
   function makeLutCell(entry) {
     var cell = document.createElement("button");
@@ -294,7 +298,7 @@
     // adiada, pra não travar a UI se a pasta tiver muitos LUTs
     setTimeout(function () {
       var lut = entry.path ? LutPanel.loadLut(entry.path) : null;
-      LutPanel.renderThumb(canvas, lut);
+      LutPanel.renderThumb(canvas, lut, lutReferenceImage);
     }, 0);
 
     return cell;
@@ -302,16 +306,19 @@
 
   function renderLutGrid() {
     if (typeof LutPanel === "undefined") return;
-    lutGrid.innerHTML = "";
-    lutSelectedPath = "";
+    LutPanel.loadCustomPreviewImage(function (img) {
+      lutReferenceImage = img;
+      lutGrid.innerHTML = "";
+      lutSelectedPath = "";
 
-    var originalCell = makeLutCell({ name: "Original", path: "" });
-    originalCell.classList.add("lut-cell-original", "selected");
-    lutGrid.appendChild(originalCell);
+      var originalCell = makeLutCell({ name: "Original", path: "" });
+      originalCell.classList.add("lut-cell-original", "selected");
+      lutGrid.appendChild(originalCell);
 
-    var files = LutPanel.listCubeFiles();
-    lutEmptyHint.style.display = files.length === 0 ? "" : "none";
-    files.forEach(function (f) { lutGrid.appendChild(makeLutCell(f)); });
+      var files = LutPanel.listCubeFiles();
+      lutEmptyHint.style.display = files.length === 0 ? "" : "none";
+      files.forEach(function (f) { lutGrid.appendChild(makeLutCell(f)); });
+    });
   }
 
   renderLutGrid();

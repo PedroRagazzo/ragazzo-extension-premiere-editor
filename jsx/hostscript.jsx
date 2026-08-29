@@ -1218,6 +1218,8 @@ function applyLutToClip(lutPath) {
     var applied = 0;
     var missingLumetri = 0;
     var missingParam = 0;
+    var setThrew = 0;
+    var discoveredNames = null; // preenchido na 1ª vez que não achamos o parâmetro — pra diagnóstico
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -1229,23 +1231,41 @@ function applyLutToClip(lutPath) {
         param = _findParam(lumetri, LUT_PARAM_NAMES[n]);
         if (param) break;
       }
-      if (!param) { missingParam++; continue; }
+      if (!param) {
+        missingParam++;
+        if (!discoveredNames) {
+          discoveredNames = [];
+          for (var p = 0; p < lumetri.properties.numItems; p++) {
+            try { discoveredNames.push(lumetri.properties[p].displayName); } catch (eName) {}
+          }
+        }
+        continue;
+      }
 
       try {
         param.setValue(lutPath, true);
         applied++;
       } catch (eSet) {
-        missingParam++; // parâmetro existe mas não aceitou o valor — mesmo desfecho que "não achei"
+        setThrew++; // parâmetro existe mas não aceitou o valor (tipo incompatível, provavelmente)
       }
     }
 
     if (applied > 0) return "ok:" + applied + " clipe(s)";
-    if (missingLumetri > 0 && missingParam === 0) {
+    if (missingLumetri > 0 && missingParam === 0 && setThrew === 0) {
       return "erro:Nenhum clipe selecionado tem o efeito 'Lumetri Color' aplicado. Adicione-o pelo painel Efeitos do Premiere e tente de novo.";
     }
-    return lutPath
-      ? "erro:Não consegui aplicar o LUT automaticamente nesta versão do Premiere. Abra o Lumetri Color no clipe, vá em Correção Básica > LUT de Entrada e selecione manualmente: " + lutPath
-      : "erro:Não consegui limpar o LUT de entrada automaticamente nesta versão do Premiere. Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
+
+    var manualStep = lutPath
+      ? "Abra o Lumetri Color no clipe, vá em Correção Básica > LUT de Entrada e selecione manualmente: " + lutPath
+      : "Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
+
+    if (setThrew > 0) {
+      return "erro:Encontrei o parâmetro de LUT, mas esta versão do Premiere não aceitou o valor nele (provavelmente exige um tipo diferente de string simples). " + manualStep;
+    }
+    // missingParam > 0: nenhum dos 3 nomes tentados bateu — devolve a lista real de
+    // parâmetros do Lumetri Color pra eu poder acrescentar o nome certo na próxima versão.
+    return "erro:Não achei o parâmetro de LUT nesta versão do Premiere (tentei: " + LUT_PARAM_NAMES.join(", ") +
+      "). Parâmetros reais do Lumetri Color neste clipe: [" + (discoveredNames || []).join(", ") + "]. " + manualStep;
   } catch (e) {
     return "erro:" + e.toString();
   }
