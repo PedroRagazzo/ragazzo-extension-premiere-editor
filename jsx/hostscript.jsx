@@ -1208,6 +1208,54 @@ function applyColorPreset(preset, amount) {
 // mais prováveis; se nenhum aceitar o valor, devolve o caminho do arquivo
 // pra aplicação manual em vez de fingir sucesso.
 // lutPath: "" tenta LIMPAR o LUT de entrada (voltar ao "Nenhum").
+// Descreve um valor de forma segura (sem lançar exceção mesmo pra objetos
+// exóticos do lado nativo do Premiere) — só pra diagnóstico em mensagens de
+// erro, não pra lógica.
+function _safeDescribe(v) {
+  if (v === null || typeof v === "undefined") return String(v);
+  var t = typeof v;
+  if (t === "number" || t === "string" || t === "boolean") return t + ":" + v;
+  if (t === "function") return "function";
+  try {
+    if (v instanceof Array) {
+      var parts = [];
+      for (var i = 0; i < v.length; i++) parts.push(_safeDescribe(v[i]));
+      return "[" + parts.join(",") + "]";
+    }
+    var keys = [];
+    for (var k in v) { keys.push(k + "=" + _safeDescribe(v[k])); }
+    return "{" + keys.join(",") + "}";
+  } catch (e) {
+    try { return String(v); } catch (e2) { return "?"; }
+  }
+}
+
+// setValue(string, true) falhou uma vez — tenta outras formas plausíveis do
+// mesmo valor antes de desistir (mesmo caminho, mas com barra normal em vez
+// de invertida; e um par de formatos "objeto" que alguns parâmetros de
+// arquivo usam em vez de string crua). Documentado como incerto porque é:
+// nenhuma fonte oficial descreve o tipo exato do parâmetro de LUT.
+function _trySetLutValue(param, lutPath) {
+  var fwd = String(lutPath).replace(/\\/g, "/");
+  var attempts = [
+    function () { param.setValue(lutPath, true); },
+    function () { param.setValue(fwd, true); },
+    function () { param.setValue({ path: lutPath }, true); },
+    function () { param.setValue({ path: fwd }, true); },
+    function () { param.setValue([lutPath], true); }
+  ];
+  var lastError = null;
+  for (var i = 0; i < attempts.length; i++) {
+    try {
+      attempts[i]();
+      return { ok: true };
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  return { ok: false, error: lastError };
+}
+
 function applyLutToClip(lutPath) {
   try {
     var seq = _requireSequence();
@@ -1220,6 +1268,7 @@ function applyLutToClip(lutPath) {
     var missingParam = 0;
     var setThrew = 0;
     var discoveredNames = null; // preenchido na 1ª vez que não achamos o parâmetro — pra diagnóstico
+    var setDiag = null; // preenchido na 1ª vez que achamos o parâmetro mas setValue falhou
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -1227,9 +1276,10 @@ function applyLutToClip(lutPath) {
       if (!lumetri) { missingLumetri++; continue; }
 
       var param = null;
+      var matchedName = null;
       for (var n = 0; n < LUT_PARAM_NAMES.length; n++) {
         param = _findParam(lumetri, LUT_PARAM_NAMES[n]);
-        if (param) break;
+        if (param) { matchedName = LUT_PARAM_NAMES[n]; break; }
       }
       if (!param) {
         missingParam++;
@@ -1242,11 +1292,19 @@ function applyLutToClip(lutPath) {
         continue;
       }
 
-      try {
-        param.setValue(lutPath, true);
+      var currentValue;
+      try { currentValue = param.getValue(); } catch (eGet) { currentValue = undefined; }
+
+      var result = _trySetLutValue(param, lutPath);
+      if (result.ok) {
         applied++;
-      } catch (eSet) {
-        setThrew++; // parâmetro existe mas não aceitou o valor (tipo incompatível, provavelmente)
+      } else {
+        setThrew++;
+        if (!setDiag) {
+          setDiag = "parâmetro: \"" + matchedName + "\" | valor atual antes de tentar: " +
+            _safeDescribe(currentValue) + " | erro da última tentativa: " +
+            (result.error ? result.error.toString() : "desconhecido");
+        }
       }
     }
 
@@ -1260,7 +1318,8 @@ function applyLutToClip(lutPath) {
       : "Abra o Lumetri Color no clipe e remova manualmente em Correção Básica > LUT de Entrada.";
 
     if (setThrew > 0) {
-      return "erro:Encontrei o parâmetro de LUT, mas esta versão do Premiere não aceitou o valor nele (provavelmente exige um tipo diferente de string simples). " + manualStep;
+      return "erro:Encontrei o parâmetro de LUT, mas nenhuma das formas que tentei de passar o valor funcionou. Diagnóstico: " +
+        setDiag + ". " + manualStep;
     }
     // missingParam > 0: nenhum dos 3 nomes tentados bateu — devolve a lista real de
     // parâmetros do Lumetri Color pra eu poder acrescentar o nome certo na próxima versão.
