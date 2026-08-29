@@ -296,12 +296,6 @@ main {
   100% { opacity: 1; }
 }
 
-.icon-blink { animation: kf-blink 1.4s infinite; }
-@keyframes kf-blink {
-  0%, 60%, 100% { opacity: .25; }
-  30% { opacity: 1; }
-}
-
 @keyframes kf-blink-soft {
   0%, 100% { opacity: .15; }
   50% { opacity: 1; }
@@ -320,7 +314,7 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .icon-zoom-group, .icon-fade, .icon-ff, .icon-align-dot, .icon-crop-a, .icon-crop-b,
   .icon-split-fill, .icon-bar, .icon-duck-a, .icon-duck-b, .icon-slide-box, .icon-hue,
-  .icon-wave-jagged, .icon-wave-smooth, .icon-blink, .icon-cascade, .icon-cutgap {
+  .icon-wave-jagged, .icon-wave-smooth, .icon-cascade, .icon-cutgap {
     animation: none !important;
   }
 }
@@ -508,6 +502,59 @@ select:focus, input:focus {
   flex-shrink: 0;
 }
 
+/* barra de Velocidade: trilha laranja pulsante + par de setas saltitantes no
+   lugar da bolinha padrão, para remeter a "avançar rápido". */
+
+.slider-speed {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;
+  background: transparent;
+}
+
+.slider-speed::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  animation: kf-speed-pulse 1.6s ease-in-out infinite;
+}
+
+.slider-speed::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 22px;
+  margin-top: -6px;
+  border-radius: 7px;
+  background-color: var(--panel);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffa74d' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 6 10 12 4 18'/%3E%3Cpolyline points='12 6 18 12 12 18'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px 16px;
+  border: 1.5px solid var(--accent-2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
+  cursor: grab;
+  animation: kf-speed-hop 0.9s ease-in-out infinite;
+}
+
+.slider-speed::-webkit-slider-thumb:active { cursor: grabbing; }
+
+@keyframes kf-speed-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
+}
+
+@keyframes kf-speed-hop {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider-speed::-webkit-slider-runnable-track, .slider-speed::-webkit-slider-thumb {
+    animation: none !important;
+  }
+}
+
 .section-sep {
   margin-top: 2px;
   padding-top: 8px;
@@ -622,52 +669,6 @@ button.primary:active { transform: scale(0.97); }
   color: var(--text-dim);
   font-size: 10px;
   line-height: 1.4;
-}
-
-/* ---------- legendas ---------- */
-
-#caption-list {
-  max-height: 220px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.caption-row {
-  display: grid;
-  grid-template-columns: 56px 56px 1fr 20px;
-  gap: 4px;
-  align-items: center;
-}
-
-.caption-row input[type="text"] {
-  width: 100%;
-  padding: 4px 5px;
-  font-size: 10px;
-}
-
-.caption-row .caption-text {
-  font-size: 11px;
-}
-
-.caption-row .caption-del {
-  background: transparent;
-  border: none;
-  color: var(--err);
-  cursor: pointer;
-  padding: 0;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.caption-row .caption-del:hover { transform: scale(1.15); background: transparent; }
-
-.caption-empty {
-  color: var(--text-dim);
-  font-size: 11px;
-  padding: 8px 0;
-  text-align: center;
 }
 
 /* ---------- editor de curva (Suavizar movimento) ---------- */

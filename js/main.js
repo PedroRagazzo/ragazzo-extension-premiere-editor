@@ -1,7 +1,6 @@
 (function () {
   var statusEl = document.getElementById("status");
   var statusTextEl = statusEl.querySelector(".status-text");
-  Captions.init();
 
   function setMessage(text, cls) {
     statusTextEl.textContent = text;
@@ -421,12 +420,6 @@
     );
   });
 
-  document.getElementById("apply-broll").addEventListener("click", function () {
-    var bin = document.getElementById("broll-bin").value;
-    var track = document.getElementById("broll-track").value;
-    run("applyBatchBRoll(" + JSON.stringify(bin) + ", " + JSON.stringify(track) + ")");
-  });
-
   document.getElementById("apply-silence-cut").addEventListener("click", function () {
     setLoading("Lendo o clipe selecionado...");
 
@@ -500,59 +493,4 @@
     });
   });
 
-  document.getElementById("caption-add").addEventListener("click", function () {
-    CepBridge.evalScript("getPlayheadSeconds()", function (result) {
-      var start = 0;
-      if (typeof result === "string" && result.indexOf("ok:") === 0) {
-        start = parseFloat(result.slice(3)) || 0;
-      }
-      Captions.addAtSeconds(start);
-    });
-  });
-
-  var fileInput = document.getElementById("caption-file-input");
-  document.getElementById("caption-import").addEventListener("click", function () {
-    fileInput.click();
-  });
-  fileInput.addEventListener("change", function () {
-    var file = fileInput.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function () {
-      var ok = Captions.importSrtText(String(reader.result));
-      setMessage(ok ? "Legendas importadas." : "Não foi possível ler esse arquivo .srt.", ok ? "ok" : "err");
-    };
-    reader.readAsText(file);
-    fileInput.value = "";
-  });
-
-  document.getElementById("caption-export").addEventListener("click", function () {
-    var srt = Captions.exportSrtText();
-    var blob = new Blob([srt], { type: "text/plain" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "legendas.srt";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-  });
-
-  document.getElementById("caption-generate").addEventListener("click", function () {
-    var cues = Captions.getCues();
-    if (cues.length === 0) {
-      setMessage("Adicione ao menos uma legenda antes de gerar.", "err");
-      return;
-    }
-    var template = document.getElementById("caption-template").value;
-    var track = document.getElementById("caption-track").value;
-    run(
-      "generateCaptionsOnTimeline(" +
-        JSON.stringify(JSON.stringify(cues)) + ", " +
-        JSON.stringify(template) + ", " +
-        JSON.stringify(track) +
-        ")"
-    );
-  });
 })();

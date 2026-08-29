@@ -246,12 +246,29 @@ function applySpeed(speedPercent) {
   }
 }
 
-// A QE DOM (legada/não documentada) expressa start/end em "ticks" (254016000000 por
-// segundo), não em segundos — usar .seconds nesses valores sempre resulta em NaN.
+// A QE DOM (legada/não documentada) expressa tempo em "ticks" (254016000000 por
+// segundo). O formato exato de qeItem.start/.inPoint/.outPoint varia entre versões
+// do Premiere: às vezes é um número (ou string) cru de ticks, às vezes um objeto
+// Time-like com .ticks ou .seconds. Esta função tenta todas as formas conhecidas
+// antes de desistir (mesmo espírito de _getParamKeyTimes, para a mesma classe de
+// API não documentada).
 var _TICKS_PER_SECOND = 254016000000;
 
-function _qeTicksToSeconds(ticks) {
-  return parseFloat(ticks) / _TICKS_PER_SECOND;
+function _qeTicksToSeconds(val) {
+  if (val === null || typeof val === "undefined") return NaN;
+
+  if (typeof val === "object") {
+    if (typeof val.seconds === "number") return val.seconds;
+    if (typeof val.ticks !== "undefined") {
+      var fromTicks = parseFloat(val.ticks);
+      if (!isNaN(fromTicks)) return fromTicks / _TICKS_PER_SECOND;
+    }
+    var fromString = parseFloat(String(val));
+    return isNaN(fromString) ? NaN : fromString / _TICKS_PER_SECOND;
+  }
+
+  var n = parseFloat(val);
+  return isNaN(n) ? NaN : n / _TICKS_PER_SECOND;
 }
 
 function _findQeItem(seq, trackItem) {
@@ -259,19 +276,43 @@ function _findQeItem(seq, trackItem) {
 }
 
 // mediaType: "Video" | "Audio"
+// Duas estratégias independentes, porque nenhuma sozinha é confiável em toda
+// versão do Premiere (API não documentada):
+//  1) casar pelo tempo de início convertido de ticks — falha se o formato de
+//     qeItem.start não bater com nenhuma das formas tratadas por _qeTicksToSeconds
+//  2) casar pela POSIÇÃO do clipe dentro da trilha — a QE DOM lista os itens na
+//     mesma ordem da trilha da DOM normal, então o índice do clipe selecionado
+//     deve bater com o índice na QE DOM mesmo quando a leitura de tempo falha
 function _findQeItemGeneric(seq, trackItem, mediaType) {
   if (typeof qe === "undefined") return null;
   var qeSeq = qe.project.getActiveSequence();
+  if (!qeSeq) return null;
   var numTracks = mediaType === "Audio" ? qeSeq.numAudioTracks : qeSeq.numVideoTracks;
+
   for (var t = 0; t < numTracks; t++) {
     var qeTrack = mediaType === "Audio" ? qeSeq.getAudioTrackAt(t) : qeSeq.getVideoTrackAt(t);
     for (var c = 0; c < qeTrack.numItems; c++) {
       var qeItem = qeTrack.getItemAt(c);
-      if (Math.abs(_qeTicksToSeconds(qeItem.start) - trackItem.start.seconds) < 0.05) {
+      var qeStartSec = _qeTicksToSeconds(qeItem.start);
+      if (!isNaN(qeStartSec) && Math.abs(qeStartSec - trackItem.start.seconds) < 0.05) {
         return qeItem;
       }
     }
   }
+
+  var trackIndex = _findTrackIndexOf(seq, trackItem) - 1;
+  if (trackIndex >= 0 && trackIndex < numTracks) {
+    var domTracks = mediaType === "Audio" ? seq.audioTracks : seq.videoTracks;
+    var domTrack = domTracks[trackIndex];
+    var qeTrackFallback = mediaType === "Audio" ? qeSeq.getAudioTrackAt(trackIndex) : qeSeq.getVideoTrackAt(trackIndex);
+    for (var ci = 0; ci < domTrack.clips.numItems; ci++) {
+      var domClip = domTrack.clips[ci];
+      if (domClip === trackItem || Math.abs(domClip.start.seconds - trackItem.start.seconds) < 0.001) {
+        return ci < qeTrackFallback.numItems ? qeTrackFallback.getItemAt(ci) : null;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -1184,183 +1225,6 @@ function applyColorPreset(preset, amount) {
       return "erro:Nenhum clipe selecionado tem o efeito 'Lumetri Color' aplicado. Adicione-o pelo painel Efeitos do Premiere e tente de novo.";
     }
     return applied > 0 ? "ok:" + applied + " clipe(s)" : "erro:Não foi possível ajustar a cor.";
-  } catch (e) {
-    return "erro:" + e.toString();
-  }
-}
-
-// ---------- B-ROLL EM LOTE ----------
-// Insere, em rodízio, os clipes de um bin do painel de projeto em cada marcador da
-// sequência, numa trilha de vídeo escolhida.
-function _isBin(item) {
-  try {
-    return item.type === ProjectItemType.BIN;
-  } catch (e) {
-    return item.type === 2;
-  }
-}
-
-function _isClip(item) {
-  try {
-    return item.type === ProjectItemType.CLIP;
-  } catch (e) {
-    return item.type === 1;
-  }
-}
-
-function _findBinByName(item, name) {
-  for (var i = 0; i < item.children.numItems; i++) {
-    var child = item.children[i];
-    if (_isBin(child) && child.name === name) return child;
-    if (_isBin(child)) {
-      var nested = _findBinByName(child, name);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
-function applyBatchBRoll(binName, trackIndex) {
-  try {
-    var seq = _requireSequence();
-    var bin = _findBinByName(app.project.rootItem, binName);
-    if (!bin) return "erro:Bin '" + binName + "' não encontrado no painel de Projeto.";
-
-    var clips = [];
-    for (var i = 0; i < bin.children.numItems; i++) {
-      var child = bin.children[i];
-      if (_isClip(child)) clips.push(child);
-    }
-    if (clips.length === 0) return "erro:O bin '" + binName + "' não contém clipes.";
-
-    var tIdx = parseInt(trackIndex, 10) - 1;
-    if (tIdx < 0 || tIdx >= seq.videoTracks.numTracks) return "erro:Trilha de vídeo inválida.";
-    var track = seq.videoTracks[tIdx];
-
-    var markerTimes = [];
-    var m = seq.markers.getFirstMarker();
-    while (m) {
-      markerTimes.push(m.start.seconds);
-      m = seq.markers.getNextMarker(m);
-    }
-    if (markerTimes.length === 0) {
-      return "erro:Nenhum marcador na sequência. Crie marcadores (tecla M) nos pontos onde o b-roll deve entrar.";
-    }
-    markerTimes.sort(function (a, b) { return a - b; });
-
-    var applied = 0;
-    for (var k = 0; k < markerTimes.length; k++) {
-      var clipItem = clips[k % clips.length];
-      try {
-        track.overwriteClip(clipItem, markerTimes[k]);
-        applied++;
-      } catch (e2) {
-        // ignora e segue pro próximo marcador
-      }
-    }
-
-    return applied > 0 ? "ok:" + applied + " b-roll(s) inserido(s)" : "erro:Não foi possível inserir os clipes de b-roll.";
-  } catch (e) {
-    return "erro:" + e.toString();
-  }
-}
-
-// ---------- LEGENDAS ----------
-function getPlayheadSeconds() {
-  try {
-    var seq = _requireSequence();
-    return "ok:" + seq.getPlayerPosition().seconds;
-  } catch (e) {
-    return "erro:" + e.toString();
-  }
-}
-
-function _findProjectItemByName(item, name) {
-  for (var i = 0; i < item.children.numItems; i++) {
-    var child = item.children[i];
-    if (child.name === name) return child;
-    if (child.children && child.children.numItems > 0) {
-      var nested = _findProjectItemByName(child, name);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
-function _findClipAtStart(track, seconds) {
-  for (var c = 0; c < track.clips.numItems; c++) {
-    var clip = track.clips[c];
-    if (Math.abs(clip.start.seconds - seconds) < 0.05) return clip;
-  }
-  return null;
-}
-
-// Heurística: seta o primeiro parâmetro de texto encontrado nos componentes do clipe
-// (funciona para o componente "Source Text" de um Gráfico do Essential Graphics).
-function _setFirstStringParam(item, text) {
-  for (var c = 0; c < item.components.numItems; c++) {
-    var comp = item.components[c];
-    for (var p = 0; p < comp.properties.numItems; p++) {
-      var prop = comp.properties[p];
-      try {
-        var val = prop.getValue();
-        if (typeof val === "string") {
-          prop.setValue(text, true);
-          return true;
-        }
-      } catch (e) {
-        // parâmetro não legível/tipo diferente, tenta o próximo
-      }
-    }
-  }
-  return false;
-}
-
-// cuesJson: [{start, end, text}]  templateName: nome do item no painel de Projeto
-// (um Gráfico do Essential Graphics com uma camada de texto, criado manualmente uma vez)
-function generateCaptionsOnTimeline(cuesJson, templateName, trackIndex) {
-  try {
-    var seq = _requireSequence();
-    var cues = JSON.parse(cuesJson);
-    if (!cues || cues.length === 0) return "erro:Nenhuma legenda para gerar.";
-
-    var template = _findProjectItemByName(app.project.rootItem, templateName);
-    if (!template) {
-      return "erro:Clipe modelo '" + templateName + "' não encontrado no painel de Projeto. Crie um Gráfico (Novo Item > Gráficos Essenciais) com uma camada de texto e nomeie-o exatamente assim.";
-    }
-
-    var tIdx = parseInt(trackIndex, 10) - 1;
-    if (tIdx < 0 || tIdx >= seq.videoTracks.numTracks) return "erro:Trilha de vídeo inválida.";
-    var track = seq.videoTracks[tIdx];
-
-    var applied = 0;
-    var textFailed = 0;
-
-    for (var i = 0; i < cues.length; i++) {
-      var cue = cues[i];
-      var inserted = track.insertClip(template, cue.start);
-      if (!inserted) continue;
-
-      var item = _findClipAtStart(track, cue.start);
-      if (!item) continue;
-
-      try {
-        item.end = _timeAt(cue.end);
-      } catch (eEnd) {
-        // se não puder ajustar o out point, mantém a duração padrão do modelo
-      }
-
-      var textSet = _setFirstStringParam(item, cue.text);
-      if (!textSet) textFailed++;
-
-      applied++;
-    }
-
-    var msg = "ok:" + applied + " legenda(s) inserida(s)";
-    if (textFailed > 0) {
-      msg += " (" + textFailed + " sem texto ajustado automaticamente — edite o texto manualmente nesses clipes)";
-    }
-    return msg;
   } catch (e) {
     return "erro:" + e.toString();
   }

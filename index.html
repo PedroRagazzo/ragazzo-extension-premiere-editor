@@ -14,52 +14,12 @@
     </span>
     <div class="brand-text">
       <h1>Ragazzo Editor · Efeitos</h1>
-      <p>Legendas, zoom, velocidade, cor e mais para o clipe selecionado</p>
+      <p>Zoom, velocidade, cor e mais para o clipe selecionado</p>
     </div>
   </header>
 
   <main>
-    <div class="effect-card open" id="captions-card">
-      <button type="button" class="effect-header">
-        <span class="effect-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9.5L5 19v-3H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/>
-            <circle class="icon-blink" style="animation-delay:0s" cx="8" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
-            <circle class="icon-blink" style="animation-delay:.2s" cx="12" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
-            <circle class="icon-blink" style="animation-delay:.4s" cx="16" cy="10.5" r="1.1" fill="currentColor" stroke="none"/>
-          </svg>
-        </span>
-        <span class="effect-title">Legendas</span>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="effect-body">
-        <div class="effect-body-inner">
-          <p class="hint">Crie as legendas aqui (manual ou importando um .srt) e gere na timeline. Para animar a entrada/saída, gere as legendas e depois selecione os clipes gerados no card "Animar clipe/objeto".</p>
-
-          <div id="caption-list"></div>
-
-          <div class="btn-group">
-            <button id="caption-add">+ No playhead</button>
-            <button id="caption-import">Importar .srt</button>
-            <button id="caption-export">Exportar .srt</button>
-          </div>
-          <input type="file" id="caption-file-input" accept=".srt,.vtt,.txt" style="display:none" />
-
-          <div class="row">
-            <label for="caption-template">Nome do modelo (Gráfico)</label>
-            <input type="text" id="caption-template" value="Legenda Template" />
-          </div>
-          <div class="row">
-            <label for="caption-track">Trilha de vídeo (nº)</label>
-            <input type="number" id="caption-track" value="3" min="1" max="20" />
-          </div>
-          <button class="primary" id="caption-generate">Gerar legendas na timeline</button>
-          <p class="hint">Requer um clipe de Gráficos Essenciais com uma camada de texto, criado uma vez no Premiere com esse nome exato — a API de script não permite criar títulos do zero. A duração de cada legenda tenta seguir o tempo definido aqui; se o Premiere ignorar o ajuste, corrija manualmente na timeline.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="effect-card">
+    <div class="effect-card open">
       <button type="button" class="effect-header">
         <span class="effect-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-zoom-group">
@@ -122,7 +82,7 @@
           <p class="hint">Muda a velocidade de reprodução do clipe (100% = original).</p>
           <div class="row slider-row">
             <label for="speed-value">Velocidade</label>
-            <input type="range" id="speed-value-range" class="slider" min="10" max="400" step="5" value="100" />
+            <input type="range" id="speed-value-range" class="slider slider-speed" min="10" max="400" step="5" value="100" />
             <input type="number" id="speed-value" class="slider-number" value="100" min="1" max="10000" />
           </div>
           <button class="primary" id="apply-speed">Aplicar velocidade</button>
@@ -559,34 +519,6 @@
         </div>
       </div>
     </div>
-
-    <div class="effect-card">
-      <button type="button" class="effect-header">
-        <span class="effect-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4.5" y="4" width="15" height="4.2" rx="1"/>
-            <rect x="4.5" y="10" width="15" height="4.2" rx="1"/>
-            <rect class="icon-slide-box" x="4.5" y="16" width="15" height="4.2" rx="1"/>
-          </svg>
-        </span>
-        <span class="effect-title">B-roll em lote</span>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="effect-body">
-        <div class="effect-body-inner">
-          <p class="hint">Insere os clipes de um bin do painel de Projeto, em rodízio, em cada marcador (tecla M) da sequência.</p>
-          <div class="row">
-            <label for="broll-bin">Nome do bin</label>
-            <input type="text" id="broll-bin" value="B-Roll" />
-          </div>
-          <div class="row">
-            <label for="broll-track">Trilha de vídeo (nº)</label>
-            <input type="number" id="broll-track" value="2" min="1" max="20" />
-          </div>
-          <button class="primary" id="apply-broll">Inserir b-roll nos marcadores</button>
-        </div>
-      </div>
-    </div>
   </main>
 
   <div id="status"><span class="spinner"></span><span class="status-text"></span></div>
@@ -594,7 +526,6 @@
   <script src="js/cep-bridge.js"></script>
   <script src="js/loudness.js"></script>
   <script src="js/silence-cut.js"></script>
-  <script src="js/captions.js"></script>
   <script src="js/curves.js"></script>
   <script src="js/graph.js"></script>
   <script src="js/curve-presets.js"></script>
