@@ -427,6 +427,23 @@
     );
   });
 
+  var silenceModeToggle = document.getElementById("silence-mode-toggle");
+  var silenceModeButtons = silenceModeToggle.querySelectorAll(".seg-btn");
+  var silenceAutoRow = document.getElementById("silence-auto-row");
+  var silenceAutoHint = document.getElementById("silence-auto-hint");
+  var silenceManualRow = document.getElementById("silence-manual-row");
+
+  Array.prototype.forEach.call(silenceModeButtons, function (btn) {
+    btn.addEventListener("click", function () {
+      Array.prototype.forEach.call(silenceModeButtons, function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      var auto = btn.getAttribute("data-mode") === "auto";
+      silenceAutoRow.style.display = auto ? "" : "none";
+      silenceAutoHint.style.display = auto ? "" : "none";
+      silenceManualRow.style.display = auto ? "none" : "";
+    });
+  });
+
   document.getElementById("apply-silence-cut").addEventListener("click", function () {
     setLoading("Lendo o clipe selecionado...");
 
@@ -444,6 +461,8 @@
         if (typeof dirResult !== "string" || dirResult.indexOf("ok:") !== 0) { setStatus(dirResult); return; }
         var dir = dirResult.slice(3);
 
+        var autoMode = silenceModeToggle.querySelector(".seg-btn.active").getAttribute("data-mode") === "auto";
+        var marginDb = parseFloat(document.getElementById("silence-margin").value);
         var thresholdDb = parseFloat(document.getElementById("silence-threshold").value);
         var minDur = parseFloat(document.getElementById("silence-min-duration").value);
         var paddingMs = parseFloat(document.getElementById("silence-padding").value);
@@ -460,6 +479,8 @@
             mediaType: clip.mediaType,
             sourceIn: clip.sourceIn,
             sourceOut: clip.sourceOut,
+            autoThreshold: autoMode,
+            marginDb: marginDb,
             thresholdDb: thresholdDb,
             minDurSec: minDur,
             paddingSec: paddingMs / 1000,
@@ -471,8 +492,9 @@
               setMessage(err.message, "err");
               return;
             }
+            var thresholdTxt = " (limiar usado: " + Math.round(cutResult.usedThresholdDb) + "dB)";
             if (cutResult.skipped) {
-              setMessage("Nenhuma pausa significativa encontrada com esses ajustes — nada foi cortado.", "ok");
+              setMessage("Nenhuma pausa significativa encontrada com esses ajustes" + thresholdTxt + " — nada foi cortado.", "ok");
               return;
             }
 
@@ -486,7 +508,8 @@
                 if (typeof finalResult === "string" && finalResult.indexOf("ok:") === 0) {
                   var removedTxt = cutResult.removedSeconds.toFixed(1);
                   setMessage(
-                    "Cortado! " + removedTxt + "s de silêncio removidos (" + cutResult.keepCount + " trechos de fala). Inserido na timeline.",
+                    "Cortado! " + removedTxt + "s de pausa removidos (" + cutResult.keepCount + " trechos de fala)" +
+                      thresholdTxt + ". Inserido na timeline.",
                     "ok"
                   );
                 } else {

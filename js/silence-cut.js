@@ -18,6 +18,15 @@
   var FFPROBE_CANDIDATES = ["ffprobe", "C:\\Users\\Ragazzo\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffprobe.exe"];
   var MAX_SEGMENTS = 400;
 
+  // Faixa de frequência da voz humana falada. Aplicado só na PASSAGEM DE DETECÇÃO
+  // (silencedetect roda com "-f null -", não gera arquivo) — o corte em si
+  // (runCut/buildCutArgs) sempre opera no áudio original, sem filtro nenhum.
+  // Isso é o que separa "pausa na fala" de "silêncio" genérico: grave de música
+  // de fundo e ruído de ventilador/tráfego ficam fora dessa faixa e não competem
+  // mais com a detecção de quando a pessoa realmente parou de falar.
+  var VOICE_HIGHPASS_HZ = 100;
+  var VOICE_LOWPASS_HZ = 6000;
+
   // ---------- lógica pura (testável sem ffmpeg/CEP) ----------
 
   // stderrText: saída do ffmpeg com o filtro silencedetect
@@ -65,6 +74,18 @@
     if (rangeEnd > cursor) keep.push({ start: cursor, end: rangeEnd });
 
     return keep.filter(function (seg) { return seg.end - seg.start > 0.02; });
+  }
+
+  // Limiar (dB) calculado a partir do volume médio do próprio clipe, em vez de um
+  // valor absoluto fixo que o usuário tem de adivinhar. meanVolumeDb vem do filtro
+  // volumedetect do ffmpeg (média de TODO o trecho, fala+pausas). marginDb é
+  // quantos dB abaixo dessa média um trecho precisa cair pra contar como pausa —
+  // maior = mais tolerante (só silêncio bem "morto" conta), menor = mais sensível.
+  function computeAutoThreshold(meanVolumeDb, marginDb) {
+    var t = meanVolumeDb - marginDb;
+    if (t > -10) t = -10;
+    if (t < -60) t = -60;
+    return t;
   }
 
   function buildCutArgs(inputPath, keepSegments, outputPath, hasVideo) {
@@ -129,11 +150,29 @@
   }
 
   function detectSilence(filePath, startSec, durationSec, thresholdDb, minDurSec, cb) {
+    // poles=2 (~12dB/oitava) em vez do padrão de 1 polo (~6dB/oitava): corte mais
+    // íngreme separa melhor "grave de música/zumbido" de "voz" — com 1 polo, ruído
+    // grave moderadamente alto ainda vazava o suficiente pra mascarar uma pausa real.
+    var af = "highpass=f=" + VOICE_HIGHPASS_HZ + ":poles=2,lowpass=f=" + VOICE_LOWPASS_HZ + ":poles=2" +
+      ",silencedetect=noise=" + thresholdDb + "dB:d=" + minDurSec;
     var args = ["-ss", String(startSec), "-i", filePath, "-t", String(durationSec),
-      "-af", "silencedetect=noise=" + thresholdDb + "dB:d=" + minDurSec, "-f", "null", "-"];
+      "-af", af, "-f", "null", "-"];
     tryBinaries(FFMPEG_CANDIDATES, args, function (err, stdout, stderr) {
       // silencedetect sempre "falha" com -f null (sem erro real) — stderr é o que importa
       cb(null, stderr || "");
+    });
+  }
+
+  // Volume médio (dB) do trecho, via o filtro volumedetect do ffmpeg — usado só
+  // no modo "Automático" pra calcular o limiar (ver computeAutoThreshold).
+  function measureNoiseFloor(filePath, startSec, durationSec, cb) {
+    var args = ["-ss", String(startSec), "-i", filePath, "-t", String(durationSec),
+      "-af", "volumedetect", "-f", "null", "-"];
+    tryBinaries(FFMPEG_CANDIDATES, args, function (err, stdout, stderr) {
+      if (err) { cb(err); return; }
+      var m = /mean_volume:\s*(-?[\d.]+)\s*dB/.exec(stderr || "");
+      if (!m) { cb(new Error("Não consegui medir o volume médio do áudio.")); return; }
+      cb(null, parseFloat(m[1]));
     });
   }
 
@@ -145,28 +184,30 @@
     });
   }
 
-  // opts: {filePath, mediaType ("Video"|"Audio"), sourceIn, sourceOut, thresholdDb, minDurSec, paddingSec, outputPath}
+  // opts: {filePath, mediaType ("Video"|"Audio"), sourceIn, sourceOut, minDurSec, paddingSec, outputPath,
+  //        autoThreshold (bool) — se true usa opts.marginDb (calcula o limiar a partir
+  //        do volume médio do clipe); se false usa opts.thresholdDb (valor manual, dB absoluto)}
   function process(opts, onProgress, cb) {
     onProgress && onProgress("Lendo informações do arquivo...");
 
-    function withRange(rangeStart, rangeEnd) {
-      onProgress && onProgress("Detectando silêncio...");
-      detectSilence(opts.filePath, rangeStart, rangeEnd - rangeStart, opts.thresholdDb, opts.minDurSec, function (err, stderrText) {
+    function withThreshold(rangeStart, rangeEnd, thresholdDb) {
+      onProgress && onProgress("Detectando pausas na fala...");
+      detectSilence(opts.filePath, rangeStart, rangeEnd - rangeStart, thresholdDb, opts.minDurSec, function (err, stderrText) {
         if (err) { cb(err); return; }
 
         var silences = parseSilenceLines(stderrText, rangeStart, rangeEnd);
         var keep = computeKeepSegments(silences, rangeStart, rangeEnd, opts.paddingSec);
 
         if (keep.length === 0) {
-          cb(new Error("O clipe inteiro foi classificado como silêncio — tente um limiar (dB) mais baixo."));
+          cb(new Error("O clipe inteiro foi classificado como pausa — tente diminuir a sensibilidade (ou, no modo manual, usar um limiar mais baixo)."));
           return;
         }
         if (keep.length === 1 && Math.abs(keep[0].start - rangeStart) < 0.05 && Math.abs(keep[0].end - rangeEnd) < 0.05) {
-          cb(null, { skipped: true, keepCount: 1, removedSeconds: 0 });
+          cb(null, { skipped: true, keepCount: 1, removedSeconds: 0, usedThresholdDb: thresholdDb });
           return;
         }
         if (keep.length > MAX_SEGMENTS) {
-          cb(new Error("Foram encontrados " + keep.length + " trechos de fala — mais do que o suporte atual (" + MAX_SEGMENTS + "). Tente um limiar de silêncio menos sensível."));
+          cb(new Error("Foram encontrados " + keep.length + " trechos de fala — mais do que o suporte atual (" + MAX_SEGMENTS + "). Tente uma sensibilidade menor (ou limiar manual mais alto)."));
           return;
         }
 
@@ -182,10 +223,23 @@
             keepCount: keep.length,
             originalSeconds: originalDur,
             keptSeconds: keptDur,
-            removedSeconds: originalDur - keptDur
+            removedSeconds: originalDur - keptDur,
+            usedThresholdDb: thresholdDb
           });
         });
       });
+    }
+
+    function withRange(rangeStart, rangeEnd) {
+      if (opts.autoThreshold) {
+        onProgress && onProgress("Medindo volume médio do áudio...");
+        measureNoiseFloor(opts.filePath, rangeStart, rangeEnd - rangeStart, function (errVol, meanVolumeDb) {
+          if (errVol) { cb(errVol); return; }
+          withThreshold(rangeStart, rangeEnd, computeAutoThreshold(meanVolumeDb, opts.marginDb));
+        });
+      } else {
+        withThreshold(rangeStart, rangeEnd, opts.thresholdDb);
+      }
     }
 
     if (opts.sourceIn !== null && opts.sourceIn !== undefined && opts.sourceOut !== null && opts.sourceOut !== undefined) {
@@ -201,8 +255,10 @@
   return {
     parseSilenceLines: parseSilenceLines,
     computeKeepSegments: computeKeepSegments,
+    computeAutoThreshold: computeAutoThreshold,
     buildCutArgs: buildCutArgs,
     totalDuration: totalDuration,
+    measureNoiseFloor: measureNoiseFloor,
     process: process
   };
 });

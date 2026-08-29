@@ -278,13 +278,26 @@
       </button>
       <div class="effect-body">
         <div class="effect-body-inner">
-          <p class="hint">Detecta pausas/silêncio no áudio do clipe selecionado (via ffmpeg) e gera automaticamente uma versão cortada, já inserida na timeline. O clipe original não é alterado.</p>
+          <p class="hint">Detecta pausas na fala do clipe selecionado — a análise foca na faixa de frequência da voz humana, então música de fundo e ruído grave contam menos — e gera automaticamente uma versão cortada, já inserida na timeline. O clipe original não é alterado.</p>
 
-          <div class="row slider-row">
-            <label for="silence-threshold">Limiar de silêncio</label>
+          <div class="seg-toggle" id="silence-mode-toggle" role="tablist">
+            <button type="button" class="seg-btn active" data-mode="auto" role="tab">Automático</button>
+            <button type="button" class="seg-btn" data-mode="manual" role="tab">Manual</button>
+          </div>
+
+          <div class="row slider-row" id="silence-auto-row">
+            <label for="silence-margin">Sensibilidade (dB abaixo da média)</label>
+            <input type="range" id="silence-margin-range" class="slider" min="6" max="30" step="1" value="18" />
+            <input type="number" id="silence-margin" class="slider-number" value="18" min="1" max="50" />
+          </div>
+          <p class="hint" id="silence-auto-hint">O limiar é calculado a partir do volume médio do próprio clipe — maior sensibilidade corta mais.</p>
+
+          <div class="row slider-row" id="silence-manual-row" style="display:none">
+            <label for="silence-threshold">Limiar manual (dB)</label>
             <input type="range" id="silence-threshold-range" class="slider" min="-60" max="-10" step="1" value="-30" />
             <input type="number" id="silence-threshold" class="slider-number" value="-30" min="-60" max="-10" />
           </div>
+
           <div class="row slider-row">
             <label for="silence-min-duration">Pausa mínima (s)</label>
             <input type="range" id="silence-min-duration-range" class="slider" min="0.1" max="2" step="0.05" value="0.4" />
